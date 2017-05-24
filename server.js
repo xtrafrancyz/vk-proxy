@@ -8,8 +8,8 @@ var http = require('http'),
 var config = require('./config');
 
 const handlers = [
-	require('./lib/handler/user-saver'),
-	require('./lib/handler/url-replacer')
+    require('./lib/handler/user-saver'),
+    require('./lib/handler/url-replacer')
 ];
 
 var app = connect();
@@ -29,9 +29,9 @@ proxy.on('proxyRes', function(proxyRes, req, res) {
 // Изменение тела ответа от вк, замена ссылочек
 app.use(transformerProxy(function(data, req, res) {
     let strData = data.toString('utf8');
-	
-	for (var i = 0, len = handlers.length; i < len; i++)
-		strData = handlers[i].transform(strData, req, res);
+
+    for (var i = 0, len = handlers.length; i < len; i++)
+        strData = handlers[i].transform(strData, req, res);
 
     return Buffer.from(strData, 'utf8');
 }));
