@@ -1,0 +1,32 @@
+{
+  "name": "vk-api-proxy",
+  "version": "0.1.1",
+  "private": true,
+  "description": "Private proxy for vk.com Api",
+  "keywords": [
+    "vk",
+    "vkontakte",
+    "proxy"
+  ],
+  "author": {
+    "name": "Dmitry Manchinskiy",
+    "email": "me@xtrafrancyz.net",
+    "url": "https://xtrafrancyz.net/"
+  },
+  "dependencies": {
+    "connect": "^3.6.2",
+    "http-proxy": "^1.16.2",
+    "transformer-proxy": "^0.3.4"
+  },
+  "files": [
+    "server.js",
+    "config.example.js",
+	"lib"
+  ],
+  "directories": {
+    "lib": "./lib"
+  },
+  "scripts": {
+    "start": "node server.js"
+  }
+}
