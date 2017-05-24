@@ -9,7 +9,8 @@ var config = require('./config');
 
 const handlers = [
     require('./lib/handler/user-saver'),
-    require('./lib/handler/url-replacer')
+    require('./lib/handler/url-replacer'),
+    require('./lib/handler/ads-remover')
 ];
 
 var app = connect();
