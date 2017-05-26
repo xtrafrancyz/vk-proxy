@@ -2,6 +2,9 @@ var config = module.exports = {};
 
 config.port = 8881;
 
+// Включает аналитику
+config.analytics = false;
+
 config.domain = {};
 
 // Домен, который нужно вписывать в "Домен API" в приложении

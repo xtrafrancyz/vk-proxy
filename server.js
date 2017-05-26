@@ -8,10 +8,11 @@ var http = require('http'),
 var config = require('./config');
 
 const handlers = [
-    require('./lib/handler/user-saver'),
     require('./lib/handler/url-replacer'),
     require('./lib/handler/ads-remover')
 ];
+if (config.analytics)
+	handlers.push(require('./lib/handler/analytics'));
 
 var app = connect();
 var proxy = httpProxy.createProxyServer({});
