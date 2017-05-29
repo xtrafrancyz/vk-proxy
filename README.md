@@ -14,3 +14,4 @@
 - Выполнить `npm install`
 - Выполнить `npm start`
 - Настроить nginx по примеру в `conf/nginx.conf`
+- Настроить HTTPS, так как приложение без него работать не будет. Можно либо подключить [Cloudflare](https://www.cloudflare.com), либо сгенерировать сертификат через [Let's Encrypt](https://certbot.eff.org) и добавить его в nginx.
