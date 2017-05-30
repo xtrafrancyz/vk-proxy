@@ -8,11 +8,12 @@ var http = require('http'),
 
 var config = require('./config');
 
-require("console-stamp")(console, {
+require('console-stamp')(console, {
     pattern: 'dd.mm.yyyy HH:MM:ss',
-    label: false,
+    label: true,
     colors: {
-        stamp: "yellow",
+        stamp: ['bold', 'yellow'],
+        label: ['bold', 'cyan'],
         metadata: "green"
     }
 });
@@ -27,11 +28,6 @@ if (config.analytics)
 var app = connect();
 var proxy = httpProxy.createProxyServer({});
 
-// Изменение запроса перед его выполнением у вк
-/*proxy.on('proxyReq', function(proxyReq, req, res, options) {
-    proxyReq.removeHeader('Accept-Encoding');
-});*/
-
 // Изменение заголовков ответа
 proxy.on('proxyRes', function(proxyRes, req, res) {
     delete proxyRes.headers['set-cookie'];
@@ -39,12 +35,43 @@ proxy.on('proxyRes', function(proxyRes, req, res) {
 
 // Изменение тела ответа от вк, замена ссылочек
 app.use(transformerProxy(function(data, req, res) {
-    let strData = data.toString('utf8');
+    try {
+        var response = {
+            __raw: data.toString('utf8'),
+            __modifiedRaw: true,
+            __modifiedJson: false,
+            get raw() {
+                if (this.__modifiedJson) {
+                    this.__modifiedJson = false;
+                    this.__raw = JSON.stringify(this.__json)
+                }
+                return this.__raw;
+            },
+            set raw(value) {
+                this.__modifiedRaw = true;
+                this.__raw = value;
+            },
+            get json() {
+                if (this.__modifiedRaw) {
+                    this.__modifiedRaw = false;
+                    this.__json = JSON.parse(this.__raw);
+                }
+                return this.__json;
+            },
+            set json(value) {
+                this.__modifiedJson = true;
+                this.__json = value;
+            }
+        };
 
-    for (var i = 0, len = handlers.length; i < len; i++)
-        strData = handlers[i].transform(strData, req, res);
+        for (var i = 0, len = handlers.length; i < len; i++)
+            handlers[i].transform(response, req, res);
 
-    return Buffer.from(strData, 'utf8');
+        return Buffer.from(response.raw, 'utf8');
+    } catch (ex) {
+        console.error(ex);
+    }
+    return data;
 }));
 
 app.use(function(req, res) {
@@ -65,7 +92,7 @@ app.use(function(req, res) {
     }
 
     for (var i = 0, len = handlers.length; i < len; i++)
-        if (handlers[i].onRequest)
+        if ('onRequest' in handlers[i])
             handlers[i].onRequest(req, res);
 
     delete req.headers['accept-encoding'];
@@ -89,8 +116,8 @@ proxy.on('error', function(err, req, res) {
         'Content-Type': 'text/plain'
     });
     res.end('Something went wrong. Proxy server does not work');
-    console.log('Error: ', err.message);
+    console.error('Error: ', err.message);
 });
 
 http.createServer(app).listen(config.port, '127.0.0.1');
-console.log("Listening on port " + config.port);
+console.info("Listening on port " + config.port);
