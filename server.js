@@ -119,5 +119,5 @@ proxy.on('error', function(err, req, res) {
     console.error('Error: ', err.message);
 });
 
-http.createServer(app).listen(config.port, '127.0.0.1');
+http.createServer(app).listen(config.port, config.host);
 console.info("Listening on port " + config.port);
