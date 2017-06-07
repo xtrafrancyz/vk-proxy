@@ -21,6 +21,7 @@
     "connect": "^3.6.2",
     "console-stamp": "^0.2.5",
     "http-proxy": "^1.16.2",
+    "sqlite3": "^3.1.8",
     "transformer-proxy": "^0.3.4"
   },
   "files": [

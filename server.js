@@ -97,7 +97,9 @@ app.use(function(req, res) {
 
     delete req.headers['accept-encoding'];
 
-    console.log(target);
+    if (config.logRequests)
+        console.log(target);
+    
     proxy.web(req, res, {
         target: target,
         ignorePath: true,

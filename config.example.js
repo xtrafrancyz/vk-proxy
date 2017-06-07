@@ -6,6 +6,9 @@ config.port = 8881;
 // Включает аналитику
 config.analytics = false;
 
+// Пишет в консоль все проксируемые запросы
+config.logRequests = true;
+
 config.domain = {};
 
 // Домен, который нужно вписывать в "Домен API" в приложении

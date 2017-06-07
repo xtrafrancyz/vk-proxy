@@ -56,4 +56,4 @@ jspm_packages/
 
 
 config.js
-users.json
+database.db
