@@ -99,7 +99,7 @@ app.use(function(req, res) {
 
     if (config.logRequests)
         console.log(target);
-    
+
     proxy.web(req, res, {
         target: target,
         ignorePath: true,
