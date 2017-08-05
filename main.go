@@ -1,0 +1,32 @@
+package main
+
+import (
+	"log"
+	"flag"
+	"os"
+	"fmt"
+	"strconv"
+
+	"github.com/valyala/fasthttp"
+)
+
+func main() {
+	pDomain := flag.String("domain", "", "used in replaces")
+	pHost := flag.String("host", "0.0.0.0", "address to bind")
+	pPort := flag.Int("port", 8881, "port to bind")
+
+	flag.Parse()
+
+	if *pDomain == "" {
+		fmt.Println("ERROR: You must specify domain with flag  -domain=your.domain")
+		os.Exit(0)
+	}
+
+	InitReplaces(*pDomain)
+	StartTicker()
+
+	log.Println("Starting server on " + *pHost + ":" + strconv.Itoa(*pPort))
+	if err := fasthttp.ListenAndServe(*pHost+":"+strconv.Itoa(*pPort), reverseProxyHandler); err != nil {
+		log.Fatalf("error in fasthttp server: %s", err)
+	}
+}
