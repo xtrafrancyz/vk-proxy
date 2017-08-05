@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"regexp"
 	"encoding/json"
+
 	"github.com/valyala/fasthttp"
 )
 
@@ -41,7 +42,7 @@ func InitReplaces(domain string) {
 	apiReplaces = []Replace{
 		NewReplace(`"https:\\/\\/(pu\.vk\.com|[-a-z0-9]+\.(?:userapi\.com|vk-cdn\.net|vk\.me|vkuser(?:live|video|audio)\.(?:net|com)))\\/([^"]+)`, `"https:\/\/`+domain+`\/_\/$1\/$2`),
 		NewReplace(`"https:\\/\\/vk\.com\\/(video_hls\.php[^"]+)`, `"https:\/\/`+domain+`\/vk.com\/$1`),
-		NewReplace(`"https:\\/\\/vk\.com\\/((images|doc[0-9]+_)[^"]+)`, `"https:\/\/`+domain+`\/_\/vk.com\/$2`),
+		NewReplace(`"https:\\/\\/vk\.com\\/((images|doc[0-9]+_)[^"]+)`, `"https:\/\/`+domain+`\/_\/vk.com\/$1`),
 		NewReplace(`"preview_url":"https:\\/\\/m\.vk\.com\\/(article[0-9]+)[^"]+"(,"preview_page":"[^"]+",?)?`, ``),
 	}
 	apiLongpollReplace = NewReplace(`"server":"api.vk.com\\/newuim`, `"server":"`+domain+`\/newuim`)
