@@ -22,10 +22,10 @@
 Для подключения к нашему публичному прокси, вы можете скачать уже готовые приложения, либо вручную заменить домен апи в официальном приложении.
 
 ### Установка измененного приложения
-#### Официальное приложение - [скачать](http://repo.xtrafrancyz.net/artifactory/list/android-public/vk/vk_4.9.1_b1137-ua-mod.apk)
+#### Официальное приложение - [скачать](http://repo.xtrafrancyz.net/android-public/vk/vk_4.9.1_b1137-ua-mod.apk)
 - Встроено прокси `vk-api-proxy.xtrafrancyz.net`
 - Убраны ссылки `https://m.vk.com/away?...`
-#### Kate Mobile - [скачать](http://repo.xtrafrancyz.net/artifactory/list/android-public/vk/kate_41.1_b403-ua-mod.apk)
+#### Kate Mobile - [скачать](http://repo.xtrafrancyz.net/android-public/vk/kate/kate_42_b406-ua-mod.apk)
 Спасибо [Андрею Панасюку](https://vk.com/truelecter) за модификацию.
 - Встроено прокси `vk-api-proxy.xtrafrancyz.net`
 
