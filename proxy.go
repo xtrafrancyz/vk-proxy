@@ -42,19 +42,21 @@ var siteHlsReplace Replace
 var sitePath = []byte("/vk.com")
 var siteHost = []byte("vk.com")
 
-func InitReplaces(domain string) {
+func InitReplaces() {
 	apiReplaces = []Replace{
-		NewReplace(`"https:\\/\\/(pu\.vk\.com|[-a-z0-9]+\.(?:userapi\.com|vk-cdn\.net|vk\.me|vkuser(?:live|video|audio)\.(?:net|com)))\\/([^"]+)`, `"https:\/\/`+domain+`\/_\/$1\/$2`),
-		NewReplace(`"https:\\/\\/vk\.com\\/(video_hls\.php[^"]+)`, `"https:\/\/`+domain+`\/vk.com\/$1`),
-		NewReplace(`"https:\\/\\/vk\.com\\/((images|doc[0-9]+_)[^"]+)`, `"https:\/\/`+domain+`\/_\/vk.com\/$1`),
+		NewReplace(`"https:\\/\\/(pu\.vk\.com|[-a-z0-9]+\.(?:userapi\.com|vk-cdn\.net|vk\.me|vkuser(?:live|video|audio)\.(?:net|com)))\\/([^"]+)`, `"https:\/\/`+config.domain+`\/_\/$1\/$2`),
+		NewReplace(`"https:\\/\\/vk\.com\\/(video_hls\.php[^"]+)`, `"https:\/\/`+config.domain+`\/vk.com\/$1`),
+		NewReplace(`"https:\\/\\/vk\.com\\/((images|doc[0-9]+_)[^"]+)`, `"https:\/\/`+config.domain+`\/_\/vk.com\/$1`),
 		NewReplace(`"preview_url":"https:\\/\\/m\.vk\.com\\/(article[0-9]+)[^"]+"(,"preview_page":"[^"]+",?)?`, ``),
 	}
-	apiLongpollReplace = NewReplace(`"server":"api.vk.com\\/newuim`, `"server":"`+domain+`\/newuim`)
+	apiLongpollReplace = NewReplace(`"server":"api.vk.com\\/newuim`, `"server":"`+config.domain+`\/newuim`)
 
-	siteHlsReplace = NewReplace(`https:\/\/([-a-z0-9]+\.(?:userapi\.com|vk-cdn\.net|vk\.me|vkuser(?:live|video)\.(?:net|com)))\/`, `https://`+domain+`/_/$1/`)
+	siteHlsReplace = NewReplace(`https:\/\/([-a-z0-9]+\.(?:userapi\.com|vk-cdn\.net|vk\.me|vkuser(?:live|video)\.(?:net|com)))\/`, `https://`+config.domain+`/_/$1/`)
 }
 
 func reverseProxyHandler(ctx *fasthttp.RequestCtx) {
+	trackRequestStart(ctx)
+
 	req := &ctx.Request
 	res := &ctx.Response
 	proxyClient := preRequest(req)
@@ -66,8 +68,6 @@ func reverseProxyHandler(ctx *fasthttp.RequestCtx) {
 }
 
 func preRequest(req *fasthttp.Request) (client *fasthttp.HostClient) {
-	trackRequestStart()
-
 	path := req.URI().Path()
 	if bytes.HasPrefix(req.URI().Path(), sitePath) {
 		client = siteProxy

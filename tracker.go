@@ -6,6 +6,7 @@ import (
 	"sync/atomic"
 
 	"code.cloudfoundry.org/bytefmt"
+	"github.com/valyala/fasthttp"
 )
 
 var tRequests uint32 = 0
@@ -23,7 +24,17 @@ func StartTicker() {
 	}()
 }
 
-func trackRequestStart() {
+func trackRequestStart(ctx *fasthttp.RequestCtx) {
+	if config.logRequests {
+		ip := ctx.Request.Header.Peek("CF-Connecting-IP") // Cloudflare
+		if ip == nil {
+			ip = ctx.Request.Header.Peek("X-Real-IP") // nginx
+		}
+		if ip == nil {
+			ip = []byte(ctx.RemoteIP().String()) // real
+		}
+		log.Printf("%s %s [%s]", ctx.Method(), ctx.Request.RequestURI(), ip)
+	}
 	atomic.AddUint32(&tRequests, 1)
 }
 

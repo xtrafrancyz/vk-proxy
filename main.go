@@ -3,29 +3,36 @@ package main
 import (
 	"log"
 	"flag"
-	"os"
 	"fmt"
 
 	"github.com/valyala/fasthttp"
 )
 
+var config struct {
+	domain      string
+	host        string
+	port        int
+	logRequests bool
+}
+
 func main() {
-	pDomain := flag.String("domain", "", "used in replaces")
-	pHost := flag.String("host", "0.0.0.0", "address to bind")
-	pPort := flag.Int("port", 8881, "port to bind")
+	flag.StringVar(&config.domain, "domain", "", "used in replaces")
+	flag.StringVar(&config.host, "host", "0.0.0.0", "address to bind")
+	flag.IntVar(&config.port, "port", 8881, "port to bind")
+	flag.BoolVar(&config.logRequests, "log-requests", false, "print every request to the log")
 
 	flag.Parse()
 
-	if *pDomain == "" {
+	if config.domain == "" {
 		fmt.Println("ERROR: You must specify domain with flag  -domain=your.domain")
-		os.Exit(0)
+		return
 	}
 
-	InitReplaces(*pDomain)
+	InitReplaces()
 	StartTicker()
 
-	log.Printf("Starting server on %s:%d", *pHost, *pPort)
-	if err := fasthttp.ListenAndServe(fmt.Sprintf("%s:%d", *pHost, *pPort), reverseProxyHandler); err != nil {
+	log.Printf("Starting server on %s:%d", config.host, config.port)
+	if err := fasthttp.ListenAndServe(fmt.Sprintf("%s:%d", config.host, config.port), reverseProxyHandler); err != nil {
 		log.Fatalf("error in fasthttp server: %s", err)
 	}
 }
