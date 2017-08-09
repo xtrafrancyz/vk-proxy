@@ -3,7 +3,6 @@ package main
 import (
 	"time"
 	"log"
-	"strconv"
 	"sync/atomic"
 
 	"code.cloudfoundry.org/bytefmt"
@@ -17,9 +16,7 @@ func StartTicker() {
 	go func() {
 		for {
 			<-ticker.C
-			log.Println(
-				"Requests: " + strconv.FormatUint(uint64(atomic.LoadUint32(&tRequests)), 10) +
-				", Traffic: " + bytefmt.ByteSize(atomic.LoadUint64(&tBytes)))
+			log.Printf("Requests: %d, Traffic: %s", atomic.LoadUint32(&tRequests), bytefmt.ByteSize(atomic.LoadUint64(&tBytes)))
 			atomic.StoreUint32(&tRequests, 0)
 			atomic.StoreUint64(&tBytes, 0)
 		}

@@ -5,7 +5,6 @@ import (
 	"flag"
 	"os"
 	"fmt"
-	"strconv"
 
 	"github.com/valyala/fasthttp"
 )
@@ -25,8 +24,8 @@ func main() {
 	InitReplaces(*pDomain)
 	StartTicker()
 
-	log.Println("Starting server on " + *pHost + ":" + strconv.Itoa(*pPort))
-	if err := fasthttp.ListenAndServe(*pHost+":"+strconv.Itoa(*pPort), reverseProxyHandler); err != nil {
+	log.Printf("Starting server on %s:%d", *pHost, *pPort)
+	if err := fasthttp.ListenAndServe(fmt.Sprintf("%s:%d", *pHost, *pPort), reverseProxyHandler); err != nil {
 		log.Fatalf("error in fasthttp server: %s", err)
 	}
 }
