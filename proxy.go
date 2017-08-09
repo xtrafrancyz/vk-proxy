@@ -19,6 +19,10 @@ func NewReplace(regex, replace string) (result Replace) {
 	return
 }
 
+func (v *Replace) apply(data []byte) []byte {
+	return v.regex.ReplaceAll(data, v.replace)
+}
+
 // Variables for api proxying # api.vk.com
 var apiProxy = &fasthttp.HostClient{
 	Addr:  "api.vk.com:443",
@@ -81,14 +85,14 @@ func postResponse(uri *fasthttp.URI, res *fasthttp.Response) {
 	res.Header.Del("Set-Cookie")
 	body := res.Body()
 	if bytes.Compare(uri.Host(), siteHost) == 0 {
-		body = siteHlsReplace.regex.ReplaceAll(body, siteHlsReplace.replace)
+		body = siteHlsReplace.apply(body)
 	} else {
 		for _, replace := range apiReplaces {
-			body = replace.regex.ReplaceAll(body, replace.replace)
+			body = replace.apply(body)
 		}
 
 		if bytes.Compare(uri.Path(), apiLongpollPath) == 0 {
-			body = apiLongpollReplace.regex.ReplaceAll(body, apiLongpollReplace.replace)
+			body = apiLongpollReplace.apply(body)
 		} else
 
 		// Clear feed from SPAM
