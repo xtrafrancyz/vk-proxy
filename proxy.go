@@ -63,12 +63,12 @@ func reverseProxyHandler(ctx *fasthttp.RequestCtx) {
 	if err := proxyClient.Do(req, res); err != nil {
 		ctx.Logger().Printf("error when proxying the request: %s", err)
 	} else {
-		postResponse(req.URI(), res)
+		postResponse(ctx)
 	}
 }
 
 func preRequest(req *fasthttp.Request) (client *fasthttp.HostClient) {
-	path := req.URI().Path()
+	path := req.RequestURI()
 	if bytes.HasPrefix(req.URI().Path(), sitePath) {
 		client = siteProxy
 		req.SetRequestURIBytes([]byte(path[7:]))
@@ -81,7 +81,9 @@ func preRequest(req *fasthttp.Request) (client *fasthttp.HostClient) {
 	return
 }
 
-func postResponse(uri *fasthttp.URI, res *fasthttp.Response) {
+func postResponse(ctx *fasthttp.RequestCtx) {
+	uri := ctx.Request.URI()
+	res := &ctx.Response
 	res.Header.Del("Set-Cookie")
 	body := res.Body()
 	if bytes.Compare(uri.Host(), siteHost) == 0 {
