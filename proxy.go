@@ -23,14 +23,18 @@ func (v *Replace) apply(data []byte) []byte {
 	return v.regex.ReplaceAll(data, v.replace)
 }
 
+type DomainConfig struct {
+	apiReplaces        []Replace
+	apiLongpollReplace Replace
+	siteHlsReplace     Replace
+}
+
 // Variables for api proxying # api.vk.com
 var apiProxy = &fasthttp.HostClient{
 	Addr:  "api.vk.com:443",
 	IsTLS: true,
 }
-var apiReplaces []Replace
 var apiLongpollPath = []byte("/method/execute")
-var apiLongpollReplace Replace
 var apiNewsfeedPath = []byte("/method/execute.getNewsfeedSmart")
 
 // Variables for site proxying # vk.com
@@ -38,24 +42,37 @@ var siteProxy = &fasthttp.HostClient{
 	Addr:  "vk.com:443",
 	IsTLS: true,
 }
-var siteHlsReplace Replace
 var sitePath = []byte("/vk.com")
 var siteHost = []byte("vk.com")
 
-func InitReplaces() {
-	apiReplaces = []Replace{
-		NewReplace(`"https:\\/\\/(pu\.vk\.com|[-a-z0-9]+\.(?:userapi\.com|vk-cdn\.net|vk\.me|vkuser(?:live|video|audio)\.(?:net|com)))\\/([^"]+)`, `"https:\/\/`+config.domain+`\/_\/$1\/$2`),
-		NewReplace(`"https:\\/\\/vk\.com\\/(video_hls\.php[^"]+)`, `"https:\/\/`+config.domain+`\/vk.com\/$1`),
-		NewReplace(`"https:\\/\\/vk\.com\\/((images|doc[0-9]+_)[^"]+)`, `"https:\/\/`+config.domain+`\/_\/vk.com\/$1`),
-		NewReplace(`"preview_page":"[0-9_]",?`, ``),
-	}
-	apiLongpollReplace = NewReplace(`"server":"api.vk.com\\/newuim`, `"server":"`+config.domain+`\/newuim`)
+var domains = make(map[string]DomainConfig)
 
-	siteHlsReplace = NewReplace(`https:\/\/([-a-z0-9]+\.(?:userapi\.com|vk-cdn\.net|vk\.me|vkuser(?:live|video)\.(?:net|com)))\/`, `https://`+config.domain+`/_/$1/`)
+func getDomainConfig(domain string) DomainConfig {
+	cfg, ok := domains[domain]
+	if !ok {
+		cfg = DomainConfig{}
+		cfg.apiReplaces = []Replace{
+			NewReplace(`"https:\\/\\/(pu\.vk\.com|[-a-z0-9]+\.(?:userapi\.com|vk-cdn\.net|vk\.me|vkuser(?:live|video|audio)\.(?:net|com)))\\/([^"]+)`, `"https:\/\/`+domain+`\/_\/$1\/$2`),
+			NewReplace(`"https:\\/\\/vk\.com\\/(video_hls\.php[^"]+)`, `"https:\/\/`+domain+`\/vk.com\/$1`),
+			NewReplace(`"https:\\/\\/vk\.com\\/((images|doc[0-9]+_)[^"]+)`, `"https:\/\/`+domain+`\/_\/vk.com\/$1`),
+			NewReplace(`"preview_page":"[0-9_]",?`, ``),
+		}
+		cfg.apiLongpollReplace = NewReplace(`"server":"api.vk.com\\/newuim`, `"server":"`+domain+`\/newuim`)
+		cfg.siteHlsReplace = NewReplace(`https:\/\/([-a-z0-9]+\.(?:userapi\.com|vk-cdn\.net|vk\.me|vkuser(?:live|video)\.(?:net|com)))\/`, `https://`+domain+`/_/$1/`)
+		domains[domain] = cfg
+	}
+	return cfg
 }
 
 func reverseProxyHandler(ctx *fasthttp.RequestCtx) {
 	trackRequestStart(ctx)
+
+	var config DomainConfig
+	if Config.domain != "" {
+		config = getDomainConfig(Config.domain)
+	} else {
+		config = getDomainConfig(string(ctx.Host()))
+	}
 
 	req := &ctx.Request
 	res := &ctx.Response
@@ -63,7 +80,7 @@ func reverseProxyHandler(ctx *fasthttp.RequestCtx) {
 	if err := proxyClient.Do(req, res); err != nil {
 		ctx.Logger().Printf("error when proxying the request: %s", err)
 	} else {
-		postResponse(ctx)
+		postResponse(config, ctx)
 	}
 }
 
@@ -81,20 +98,20 @@ func preRequest(req *fasthttp.Request) (client *fasthttp.HostClient) {
 	return
 }
 
-func postResponse(ctx *fasthttp.RequestCtx) {
+func postResponse(config DomainConfig, ctx *fasthttp.RequestCtx) {
 	uri := ctx.Request.URI()
 	res := &ctx.Response
 	res.Header.Del("Set-Cookie")
 	body := res.Body()
 	if bytes.Compare(uri.Host(), siteHost) == 0 {
-		body = siteHlsReplace.apply(body)
+		body = config.siteHlsReplace.apply(body)
 	} else {
-		for _, replace := range apiReplaces {
+		for _, replace := range config.apiReplaces {
 			body = replace.apply(body)
 		}
 
 		if bytes.Compare(uri.Path(), apiLongpollPath) == 0 {
-			body = apiLongpollReplace.apply(body)
+			body = config.apiLongpollReplace.apply(body)
 		} else
 
 		// Clear feed from SPAM

@@ -25,7 +25,7 @@ func StartTicker() {
 }
 
 func trackRequestStart(ctx *fasthttp.RequestCtx) {
-	if config.logRequests {
+	if Config.logRequests {
 		ip := ctx.Request.Header.Peek("CF-Connecting-IP") // Cloudflare
 		if ip == nil {
 			ip = ctx.Request.Header.Peek("X-Real-IP") // nginx
