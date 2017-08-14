@@ -65,8 +65,6 @@ func getDomainConfig(domain string) DomainConfig {
 }
 
 func reverseProxyHandler(ctx *fasthttp.RequestCtx) {
-	trackRequestStart(ctx)
-
 	var config DomainConfig
 	if Config.domain != "" {
 		config = getDomainConfig(Config.domain)
@@ -75,10 +73,10 @@ func reverseProxyHandler(ctx *fasthttp.RequestCtx) {
 	}
 
 	req := &ctx.Request
-	res := &ctx.Response
 	proxyClient := preRequest(req)
-	if err := proxyClient.Do(req, res); err != nil {
+	if err := proxyClient.Do(req, &ctx.Response); err != nil {
 		ctx.Logger().Printf("error when proxying the request: %s", err)
+		trackRequest(ctx, 0)
 	} else {
 		postResponse(config, ctx)
 	}
@@ -147,5 +145,5 @@ func postResponse(config DomainConfig, ctx *fasthttp.RequestCtx) {
 	}
 	res.SetBody(body)
 
-	trackRequestEnd(len(body))
+	trackRequest(ctx, len(body))
 }
