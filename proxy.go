@@ -47,7 +47,7 @@ var siteHost = []byte("vk.com")
 
 var domains = make(map[string]DomainConfig)
 
-func getDomainConfig(domain string) DomainConfig {
+func getDomainConfig(domain string) *DomainConfig {
 	cfg, ok := domains[domain]
 	if !ok {
 		cfg = DomainConfig{}
@@ -61,11 +61,20 @@ func getDomainConfig(domain string) DomainConfig {
 		cfg.siteHlsReplace = NewReplace(`https:\/\/([-a-z0-9]+\.(?:userapi\.com|vk-cdn\.net|vk\.me|vkuser(?:live|video)\.(?:net|com)))\/`, `https://`+domain+`/_/$1/`)
 		domains[domain] = cfg
 	}
-	return cfg
+	return &cfg
 }
 
 func reverseProxyHandler(ctx *fasthttp.RequestCtx) {
-	var config DomainConfig
+	defer func() {
+		if r := recover(); r != nil {
+			ctx.Logger().Printf("panic when proxying the request: %s", r)
+			ctx.Response.Reset()
+			ctx.SetStatusCode(500)
+			ctx.SetBodyString("500 Internal error")
+		}
+	}()
+
+	var config *DomainConfig
 	if Config.domain != "" {
 		config = getDomainConfig(Config.domain)
 	} else {
@@ -96,7 +105,7 @@ func preRequest(req *fasthttp.Request) (client *fasthttp.HostClient) {
 	return
 }
 
-func postResponse(config DomainConfig, ctx *fasthttp.RequestCtx) {
+func postResponse(config *DomainConfig, ctx *fasthttp.RequestCtx) {
 	uri := ctx.Request.URI()
 	res := &ctx.Response
 	res.Header.Del("Set-Cookie")
