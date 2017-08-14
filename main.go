@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/valyala/fasthttp"
+	"github.com/vharitonsky/iniflags"
 )
 
 var config struct {
@@ -21,7 +22,7 @@ func main() {
 	flag.IntVar(&config.port, "port", 8881, "port to bind")
 	flag.BoolVar(&config.logRequests, "log-requests", false, "print every request to the log")
 
-	flag.Parse()
+	iniflags.Parse()
 
 	if config.domain == "" {
 		fmt.Println("ERROR: You must specify domain with flag  -domain=your.domain")
