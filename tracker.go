@@ -50,6 +50,8 @@ func trackRequest(ctx *fasthttp.RequestCtx, size int) {
 	tBytes += uint64(size)
 }
 
+// Used only for performance testing
+// >> defer trackTime(time.Now(), "name")
 func trackTime(start time.Time, name string) {
 	elapsed := time.Since(start)
 	log.Printf("%s took %s", name, elapsed)
