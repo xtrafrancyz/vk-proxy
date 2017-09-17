@@ -3,7 +3,7 @@ package main
 import (
 	"bytes"
 	"regexp"
-	"errors"
+	"strings"
 	"encoding/json"
 
 	"github.com/valyala/fasthttp"
@@ -92,7 +92,7 @@ func reverseProxyHandler(ctx *fasthttp.RequestCtx) {
 			ctx.Logger().Printf("panic when proxying the request: %s", r)
 			ctx.Response.Reset()
 			ctx.SetStatusCode(500)
-			ctx.SetBodyString("500 Internal error")
+			ctx.SetBodyString("500 Internal Server Error")
 		}
 	}()
 
@@ -104,29 +104,38 @@ func reverseProxyHandler(ctx *fasthttp.RequestCtx) {
 	}
 
 	req := &ctx.Request
-	if err := preRequest(req); err != nil {
-		ctx.Response.BodyWriter().Write([]byte(err.Error()))
-		ctx.Response.SetStatusCode(500)
+	if !preRequest(req) {
+		ctx.Response.SetStatusCode(400)
+		ctx.Response.SetBodyString("400 Bad Request")
 		return
 	}
+
 	if err := client.Do(req, &ctx.Response); err != nil {
 		ctx.Logger().Printf("error when proxying the request: %s", err)
+		ctx.Response.Reset()
+		if strings.Contains(err.Error(), "timed out") || strings.Contains(err.Error(), "timeout") {
+			ctx.SetStatusCode(408)
+			ctx.SetBodyString("408 Request Timeout")
+		} else {
+			ctx.SetStatusCode(500)
+			ctx.SetBodyString("500 Internal Server Error")
+		}
 		trackRequest(ctx, 0)
 	} else {
 		postResponse(config, ctx)
 	}
 }
 
-func preRequest(req *fasthttp.Request) error {
+func preRequest(req *fasthttp.Request) bool {
 	path := req.RequestURI()
 	if bytes.HasPrefix(path, atPath) {
 		slashIndex := bytes.IndexRune(path[1:], '/')
 		if slashIndex == -1 {
-			return errors.New("bad request")
+			return false
 		}
 		endpoint := []byte(path[4:slashIndex+1])
 		if !bytes.Equal(endpoint, siteHost) && !bytes.HasSuffix(endpoint, siteHostRoot) {
-			return errors.New("bad endpoint")
+			return false
 		}
 		req.Header.SetHostBytes(endpoint)
 		req.SetRequestURIBytes([]byte(path[1+slashIndex:]))
@@ -136,7 +145,7 @@ func preRequest(req *fasthttp.Request) error {
 	// After req.URI() call it is impossible to modify URI
 	req.URI().SetSchemeBytes(https)
 	req.Header.Del("Accept-Encoding")
-	return nil
+	return true
 }
 
 func postResponse(config *DomainConfig, ctx *fasthttp.RequestCtx) {
