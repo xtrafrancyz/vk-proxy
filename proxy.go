@@ -77,8 +77,8 @@ func getDomainConfig(domain string) *DomainConfig {
 			newStringReplace(`"https:\/\/vk.com\/video_hls.php`, `"https:\/\/`+domain+`\/@vk.com\/video_hls.php`),
 			newRegexReplace(`"https:\\/\\/vk\.com\\/(images\\/|doc-?[0-9]+_)`, `"https:\/\/`+domain+`\/_\/vk.com\/$1`),
 		}
-		cfg.apiOfficialLongpollReplace = newStringReplace(`"server":"api.vk.com\/newuim`, `"server":"`+domain+`\/_\/api.vk.com/newuim`)
-		cfg.apiLongpollReplace = newStringReplace(`"server":"`, `"server":"`+domain+`\/_`)
+		cfg.apiOfficialLongpollReplace = newStringReplace(`"server":"api.vk.com\/newuim`, `"server":"`+domain+`\/_\/api.vk.com\/newuim`)
+		cfg.apiLongpollReplace = newStringReplace(`"server":"`, `"server":"`+domain+`\/_\/`)
 		cfg.siteHlsReplace = newRegexReplace(`https:\/\/([-a-z0-9]+\.(?:userapi\.com|vk-cdn\.net|vk\.me|vkuser(?:live|video)\.(?:net|com)))\/`, `https://`+domain+`/_/$1/`)
 		domains[domain] = cfg
 	}
