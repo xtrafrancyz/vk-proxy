@@ -1,5 +1,5 @@
 # vk-proxy
-[![Jenkins](https://img.shields.io/jenkins/s/https/ci.xtrafrancyz.net/job/vk-proxy.svg)](https://ci.xtrafrancyz.net/job/vk-proxy/)
+[![Jenkins](https://img.shields.io/jenkins/s/https/ci.xtrafrancyz.net/job/Public/job/vk-proxy.svg)](https://ci.xtrafrancyz.net/job/Public/job/vk-proxy/)
 
 Прокси-сервер для приложения ВКонтакте на Android.
 
