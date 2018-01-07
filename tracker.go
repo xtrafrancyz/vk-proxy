@@ -1,9 +1,9 @@
 package main
 
 import (
-	"time"
 	"log"
 	"sync"
+	"time"
 
 	"code.cloudfoundry.org/bytefmt"
 	"github.com/valyala/fasthttp"

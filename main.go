@@ -1,9 +1,9 @@
 package main
 
 import (
-	"log"
 	"flag"
 	"fmt"
+	"log"
 
 	"github.com/valyala/fasthttp"
 	"github.com/vharitonsky/iniflags"

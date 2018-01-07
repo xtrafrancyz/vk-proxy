@@ -4,8 +4,8 @@ import (
 	"bytes"
 	"regexp"
 	"strings"
-	"encoding/json"
 
+	"github.com/json-iterator/go"
 	"github.com/valyala/fasthttp"
 )
 
@@ -67,6 +67,7 @@ var (
 
 var client = &fasthttp.Client{}
 var domains = make(map[string]*DomainConfig)
+var json = jsoniter.ConfigFastest
 
 func getDomainConfig(domain string) *DomainConfig {
 	cfg, ok := domains[domain]
@@ -132,7 +133,7 @@ func preRequest(req *fasthttp.Request) bool {
 		if slashIndex == -1 {
 			return false
 		}
-		endpoint := []byte(path[4:slashIndex+1])
+		endpoint := []byte(path[4: slashIndex+1])
 		if !bytes.Equal(endpoint, siteHost) && !bytes.HasSuffix(endpoint, siteHostRoot) {
 			return false
 		}
