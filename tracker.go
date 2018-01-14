@@ -43,11 +43,12 @@ func trackRequest(ctx *fasthttp.RequestCtx, size int) {
 	}
 
 	tLock.Lock()
-	defer tLock.Unlock()
 
 	tUniqueUsers[string(ip)] = true
 	tRequests++
 	tBytes += uint64(size)
+
+	tLock.Unlock()
 }
 
 // Used only for performance testing
