@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"net/url"
 	"regexp"
 	"strings"
 
@@ -59,6 +60,7 @@ var (
 	apiLongpollPath         = []byte("/method/messages.getLongPollServer")
 	videoHlsPath            = []byte("/video_hls.php")
 	atPath                  = []byte("/%40")
+	awayPath                = []byte("/away")
 	https                   = []byte("https")
 	apiHost                 = []byte("api.vk.com")
 	siteHost                = []byte("vk.com")
@@ -103,14 +105,19 @@ func reverseProxyHandler(ctx *fasthttp.RequestCtx) {
 		config = getDomainConfig(string(ctx.Host()))
 	}
 
-	req := &ctx.Request
-	if !preRequest(req) {
+	if !preRequest(ctx) {
 		ctx.Response.SetStatusCode(400)
 		ctx.Response.SetBodyString("400 Bad Request")
 		return
 	}
 
-	if err := client.Do(req, &ctx.Response); err != nil {
+	// In case of redirect
+	if ctx.Response.StatusCode() != 200 {
+		trackRequest(ctx, 0)
+		return
+	}
+
+	if err := client.Do(&ctx.Request, &ctx.Response); err != nil {
 		ctx.Logger().Printf("error when proxying the request: %s", err)
 		ctx.Response.Reset()
 		if strings.Contains(err.Error(), "timed out") || strings.Contains(err.Error(), "timeout") {
@@ -126,7 +133,8 @@ func reverseProxyHandler(ctx *fasthttp.RequestCtx) {
 	}
 }
 
-func preRequest(req *fasthttp.Request) bool {
+func preRequest(ctx *fasthttp.RequestCtx) bool {
+	req := ctx.Request
 	path := req.RequestURI()
 	if bytes.HasPrefix(path, atPath) {
 		slashIndex := bytes.IndexRune(path[1:], '/')
@@ -139,6 +147,17 @@ func preRequest(req *fasthttp.Request) bool {
 		}
 		req.Header.SetHostBytes(endpoint)
 		req.SetRequestURIBytes([]byte(path[1+slashIndex:]))
+	} else if bytes.HasPrefix(path, awayPath) {
+		to := string(req.URI().QueryArgs().Peek("to"))
+		if to == "" {
+			return false
+		}
+		to, err := url.QueryUnescape(to)
+		if err != nil {
+			return false
+		}
+		ctx.Redirect(to, 301)
+		return true
 	} else {
 		req.SetHostBytes(apiHost)
 	}
