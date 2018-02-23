@@ -134,7 +134,7 @@ func reverseProxyHandler(ctx *fasthttp.RequestCtx) {
 }
 
 func preRequest(ctx *fasthttp.RequestCtx) bool {
-	req := ctx.Request
+	req := &ctx.Request
 	path := req.RequestURI()
 	if bytes.HasPrefix(path, atPath) {
 		slashIndex := bytes.IndexRune(path[1:], '/')
