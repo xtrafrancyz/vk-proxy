@@ -55,16 +55,17 @@ type DomainConfig struct {
 
 // Constants
 var (
-	apiOfficialLongpollPath = []byte("/method/execute")
-	apiOfficialNewsfeedPath = []byte("/method/execute.getNewsfeedSmart")
-	apiLongpollPath         = []byte("/method/messages.getLongPollServer")
-	videoHlsPath            = []byte("/video_hls.php")
-	atPath                  = []byte("/%40")
-	awayPath                = []byte("/away")
-	https                   = []byte("https")
-	apiHost                 = []byte("api.vk.com")
-	siteHost                = []byte("vk.com")
-	siteHostRoot            = []byte(".vk.com")
+	apiOfficialLongpollPath  = []byte("/method/execute")
+	apiOfficialLongpollPath2 = []byte("/method/execute.imGetLongPollHistoryExtended")
+	apiOfficialNewsfeedPath  = []byte("/method/execute.getNewsfeedSmart")
+	apiLongpollPath          = []byte("/method/messages.getLongPollServer")
+	videoHlsPath             = []byte("/video_hls.php")
+	atPath                   = []byte("/%40")
+	awayPath                 = []byte("/away")
+	https                    = []byte("https")
+	apiHost                  = []byte("api.vk.com")
+	siteHost                 = []byte("vk.com")
+	siteHostRoot             = []byte(".vk.com")
 )
 
 var client = &fasthttp.Client{}
@@ -188,7 +189,7 @@ func postResponse(config *DomainConfig, ctx *fasthttp.RequestCtx) {
 		} else
 
 		// Replace longpoll server for official app
-		if bytes.Equal(uri.Path(), apiOfficialLongpollPath) {
+		if bytes.Equal(uri.Path(), apiOfficialLongpollPath) || bytes.Equal(uri.Path(), apiOfficialLongpollPath2) {
 			body = config.apiOfficialLongpollReplace.apply(body)
 		} else
 
