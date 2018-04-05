@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"os"
 
 	"github.com/valyala/fasthttp"
 	"github.com/vharitonsky/iniflags"
@@ -16,9 +17,14 @@ var Config struct {
 	port              int
 	logRequests       bool
 	reduceMemoryUsage bool
+	debug             bool
 }
 
 func main() {
+	if os.Getenv("VK_PROXY_DEBUG") == "1" {
+		Config.debug = true
+	}
+
 	flag.StringVar(&Config.unix, "unix", "", "unix domain socket to bind (example /var/run/vk-proxy.sock)")
 	flag.StringVar(&Config.host, "host", "0.0.0.0", "address to bind")
 	flag.IntVar(&Config.port, "port", 8881, "port to bind")

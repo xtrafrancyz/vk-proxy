@@ -38,7 +38,7 @@ func trackRequest(ctx *fasthttp.RequestCtx, size int) {
 		ip = []byte(ctx.RemoteIP().String()) // real
 	}
 
-	if Config.logRequests {
+	if Config.logRequests && !Config.debug {
 		log.Printf("%s %s [%s]", ctx.Method(), ctx.Request.RequestURI(), ip)
 	}
 

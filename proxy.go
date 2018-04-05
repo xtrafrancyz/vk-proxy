@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"log"
 	"net/url"
 	"regexp"
 	"strings"
@@ -59,6 +60,7 @@ var (
 	apiOfficialLongpollPath2 = []byte("/method/execute.imGetLongPollHistoryExtended")
 	apiOfficialNewsfeedPath  = []byte("/method/execute.getNewsfeedSmart")
 	apiLongpollPath          = []byte("/method/messages.getLongPollServer")
+	apiNewsfeedGet           = []byte("/method/newsfeed.get")
 	videoHlsPath             = []byte("/video_hls.php")
 	atPath                   = []byte("/%40")
 	awayPath                 = []byte("/away")
@@ -142,7 +144,7 @@ func preRequest(ctx *fasthttp.RequestCtx) bool {
 		if slashIndex == -1 {
 			return false
 		}
-		endpoint := []byte(path[4: slashIndex+1])
+		endpoint := []byte(path[4:slashIndex+1])
 		if !bytes.Equal(endpoint, siteHost) && !bytes.HasSuffix(endpoint, siteHostRoot) {
 			return false
 		}
@@ -194,37 +196,46 @@ func postResponse(config *DomainConfig, ctx *fasthttp.RequestCtx) {
 		} else
 
 		// Clear feed from SPAM
-		if bytes.Equal(uri.Path(), apiOfficialNewsfeedPath) {
+		if bytes.Equal(uri.Path(), apiOfficialNewsfeedPath) || bytes.Equal(uri.Path(), apiNewsfeedGet) {
 			var parsed map[string]interface{}
 			if err := json.Unmarshal(body, &parsed); err == nil {
-				removed := 0
 				if parsed["response"] != nil {
 					response := parsed["response"].(map[string]interface{})
 					if response["items"] != nil {
-						items := response["items"].([]interface{})
-						for i := len(items) - 1; i >= 0; i-- {
-							post := items[i].(map[string]interface{})
-							if post["type"] == "ads" || (post["type"] == "post" && post["marked_as_ads"] != nil && post["marked_as_ads"].(float64) == 1) {
-								items[i] = items[len(items)-1]
-								items[len(items)-1] = nil
-								items = items[:len(items)-1]
-								removed++
-							}
-						}
-						if removed > 0 {
-							newItems := make([]interface{}, len(items))
-							copy(newItems, items)
+						newItems, modified := filterFeed(response["items"].([]interface{}))
+						if modified {
 							response["items"] = newItems
+							body, err = json.Marshal(parsed)
 						}
 					}
-				}
-				if removed > 0 {
-					body, err = json.Marshal(parsed)
 				}
 			}
 		}
 	}
 	res.SetBody(body)
 
+	if Config.debug {
+		log.Println(string(uri.Path()) + "\n" + string(body))
+	}
+
 	trackRequest(ctx, len(body))
+}
+
+func filterFeed(items []interface{}) ([]interface{}, bool) {
+	removed := 0
+	for i := len(items) - 1; i >= 0; i-- {
+		post := items[i].(map[string]interface{})
+		if post["type"] == "ads" || (post["type"] == "post" && post["marked_as_ads"] != nil && post["marked_as_ads"].(float64) == 1) {
+			items[i] = items[len(items)-1]
+			items[len(items)-1] = nil
+			items = items[:len(items)-1]
+			removed++
+		}
+	}
+	if removed > 0 {
+		newItems := make([]interface{}, len(items))
+		copy(newItems, items)
+		return newItems, true
+	}
+	return nil, false
 }
