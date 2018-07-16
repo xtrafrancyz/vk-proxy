@@ -58,6 +58,7 @@ type DomainConfig struct {
 var (
 	apiOfficialLongpollPath  = []byte("/method/execute")
 	apiOfficialLongpollPath2 = []byte("/method/execute.imGetLongPollHistoryExtended")
+	apiOfficialLongpollPath3 = []byte("/method/execute.imLpInit")
 	apiOfficialNewsfeedPath  = []byte("/method/execute.getNewsfeedSmart")
 	apiLongpollPath          = []byte("/method/messages.getLongPollServer")
 	apiNewsfeedGet           = []byte("/method/newsfeed.get")
@@ -175,9 +176,10 @@ func postResponse(config *DomainConfig, ctx *fasthttp.RequestCtx) {
 	res := &ctx.Response
 	res.Header.Del("Set-Cookie")
 	body := res.Body()
+	path := uri.Path()
 
 	if bytes.Equal(uri.Host(), siteHost) {
-		if bytes.Equal(uri.Path(), videoHlsPath) {
+		if bytes.Equal(path, videoHlsPath) {
 			body = config.siteHlsReplace.apply(body)
 		}
 	} else {
@@ -186,17 +188,20 @@ func postResponse(config *DomainConfig, ctx *fasthttp.RequestCtx) {
 		}
 
 		// Replace longpoll server
-		if bytes.Equal(uri.Path(), apiLongpollPath) {
+		if bytes.Equal(path, apiLongpollPath) {
 			body = config.apiLongpollReplace.apply(body)
 		} else
 
 		// Replace longpoll server for official app
-		if bytes.Equal(uri.Path(), apiOfficialLongpollPath) || bytes.Equal(uri.Path(), apiOfficialLongpollPath2) {
+		if bytes.Equal(path, apiOfficialLongpollPath) ||
+			bytes.Equal(path, apiOfficialLongpollPath2) ||
+			bytes.Equal(path, apiOfficialLongpollPath3) {
 			body = config.apiOfficialLongpollReplace.apply(body)
 		} else
 
 		// Clear feed from SPAM
-		if bytes.Equal(uri.Path(), apiOfficialNewsfeedPath) || bytes.Equal(uri.Path(), apiNewsfeedGet) {
+		if bytes.Equal(path, apiOfficialNewsfeedPath) ||
+			bytes.Equal(path, apiNewsfeedGet) {
 			var parsed map[string]interface{}
 			if err := json.Unmarshal(body, &parsed); err == nil {
 				if parsed["response"] != nil {
@@ -215,7 +220,7 @@ func postResponse(config *DomainConfig, ctx *fasthttp.RequestCtx) {
 	res.SetBody(body)
 
 	if Config.debug {
-		log.Println(string(uri.Path()) + "\n" + string(body))
+		log.Println(string(path) + "\n" + string(body))
 	}
 
 	trackRequest(ctx, len(body))
