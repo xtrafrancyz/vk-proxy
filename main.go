@@ -17,6 +17,7 @@ var Config struct {
 	port              int
 	logRequests       bool
 	reduceMemoryUsage bool
+	removeAdsFromFeed bool
 	debug             bool
 }
 
@@ -31,6 +32,7 @@ func main() {
 	flag.StringVar(&Config.domain, "domain", "", "force use this domain for replaces")
 	flag.BoolVar(&Config.logRequests, "log-requests", false, "print every request to the log")
 	flag.BoolVar(&Config.reduceMemoryUsage, "reduce-memory-usage", false, "reduces memory usage at the cost of higher CPU usage")
+	flag.BoolVar(&Config.removeAdsFromFeed, "remove-ads-from-feed", true, "when enabled, ads from feed will be removed")
 
 	iniflags.Parse()
 

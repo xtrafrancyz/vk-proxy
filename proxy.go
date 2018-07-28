@@ -197,20 +197,22 @@ func postResponse(config *DomainConfig, ctx *fasthttp.RequestCtx) {
 			bytes.Equal(path, apiOfficialLongpollPath2) ||
 			bytes.Equal(path, apiOfficialLongpollPath3) {
 			body = config.apiOfficialLongpollReplace.apply(body)
-		} else
+		}
 
 		// Clear feed from SPAM
-		if bytes.Equal(path, apiOfficialNewsfeedPath) ||
-			bytes.Equal(path, apiNewsfeedGet) {
-			var parsed map[string]interface{}
-			if err := json.Unmarshal(body, &parsed); err == nil {
-				if parsed["response"] != nil {
-					response := parsed["response"].(map[string]interface{})
-					if response["items"] != nil {
-						newItems, modified := filterFeed(response["items"].([]interface{}))
-						if modified {
-							response["items"] = newItems
-							body, err = json.Marshal(parsed)
+		if Config.removeAdsFromFeed {
+			if bytes.Equal(path, apiOfficialNewsfeedPath) ||
+				bytes.Equal(path, apiNewsfeedGet) {
+				var parsed map[string]interface{}
+				if err := json.Unmarshal(body, &parsed); err == nil {
+					if parsed["response"] != nil {
+						response := parsed["response"].(map[string]interface{})
+						if response["items"] != nil {
+							newItems, modified := filterFeed(response["items"].([]interface{}))
+							if modified {
+								response["items"] = newItems
+								body, err = json.Marshal(parsed)
+							}
 						}
 					}
 				}
