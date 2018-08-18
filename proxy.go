@@ -6,6 +6,7 @@ import (
 	"net/url"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/json-iterator/go"
 	"github.com/valyala/fasthttp"
@@ -71,7 +72,9 @@ var (
 	siteHostRoot             = []byte(".vk.com")
 )
 
-var client = &fasthttp.Client{}
+var client = &fasthttp.Client{
+	Name: "vk-proxy",
+}
 var domains = make(map[string]*DomainConfig)
 var json = jsoniter.ConfigFastest
 
@@ -80,8 +83,8 @@ func getDomainConfig(domain string) *DomainConfig {
 	if !ok {
 		cfg = &DomainConfig{}
 		cfg.apiReplaces = []replace{
-			newRegexReplace(`"https:\\/\\/(pu\.vk\.com|[-_a-zA-Z0-9]+\.(?:userapi\.com|vk-cdn\.net|vk\.me|vkuser(?:live|video|audio)\.(?:net|com)))\\/`, `"https:\/\/`+domain+`\/_\/$1\/`),
 			newStringReplace(`"https:\/\/vk.com\/video_hls.php`, `"https:\/\/`+domain+`\/@vk.com\/video_hls.php`),
+			newRegexReplace(`"https:\\/\\/([-_a-zA-Z0-9]+\.(?:userapi\.com|vk-cdn\.net|vk\.(?:me|com)|vkuser(?:live|video|audio)\.(?:net|com)))\\/`, `"https:\/\/`+domain+`\/_\/$1\/`),
 			newRegexReplace(`"https:\\/\\/vk\.com\\/(images\\/|doc-?[0-9]+_)`, `"https:\/\/`+domain+`\/_\/vk.com\/$1`),
 		}
 		cfg.apiOfficialLongpollReplace = newStringReplace(`"server":"api.vk.com\/newuim`, `"server":"`+domain+`\/_\/api.vk.com\/newuim`)
@@ -121,7 +124,7 @@ func reverseProxyHandler(ctx *fasthttp.RequestCtx) {
 		return
 	}
 
-	if err := client.Do(&ctx.Request, &ctx.Response); err != nil {
+	if err := client.DoTimeout(&ctx.Request, &ctx.Response, 30*time.Second); err != nil {
 		ctx.Logger().Printf("error when proxying the request: %s", err)
 		ctx.Response.Reset()
 		if strings.Contains(err.Error(), "timed out") || strings.Contains(err.Error(), "timeout") {

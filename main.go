@@ -41,6 +41,7 @@ func main() {
 	server := &fasthttp.Server{
 		Handler:           reverseProxyHandler,
 		ReduceMemoryUsage: Config.reduceMemoryUsage,
+		Name:              "vk-proxy",
 	}
 
 	var err error
