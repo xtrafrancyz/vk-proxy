@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"log"
 	"net/url"
-	"regexp"
 	"strings"
 	"time"
 
@@ -12,76 +11,23 @@ import (
 	"github.com/valyala/fasthttp"
 )
 
-type replace interface {
-	apply(data []byte) []byte
-}
-
-type regexReplace struct {
-	regex       *regexp.Regexp
-	replacement []byte
-}
-
-func newRegexReplace(regex, replace string) *regexReplace {
-	return &regexReplace{
-		regex:       regexp.MustCompile(regex),
-		replacement: []byte(replace),
-	}
-}
-
-func (v *regexReplace) apply(data []byte) []byte {
-	return v.regex.ReplaceAll(data, v.replacement)
-}
-
-type stringReplace struct {
-	needle      []byte
-	replacement []byte
-}
-
-func newStringReplace(needle, replace string) *stringReplace {
-	return &stringReplace{
-		needle:      []byte(needle),
-		replacement: []byte(replace),
-	}
-}
-
-func (v *stringReplace) apply(data []byte) []byte {
-	return bytes.Replace(data, v.needle, v.replacement, -1)
-}
-
-type DomainConfig struct {
+type domainConfig struct {
 	apiReplaces                []replace
 	apiOfficialLongpollReplace replace
 	apiLongpollReplace         replace
 	siteHlsReplace             replace
 }
 
-// Constants
-var (
-	apiOfficialLongpollPath  = []byte("/method/execute")
-	apiOfficialLongpollPath2 = []byte("/method/execute.imGetLongPollHistoryExtended")
-	apiOfficialLongpollPath3 = []byte("/method/execute.imLpInit")
-	apiOfficialNewsfeedPath  = []byte("/method/execute.getNewsfeedSmart")
-	apiLongpollPath          = []byte("/method/messages.getLongPollServer")
-	apiNewsfeedGet           = []byte("/method/newsfeed.get")
-	videoHlsPath             = []byte("/video_hls.php")
-	atPath                   = []byte("/%40")
-	awayPath                 = []byte("/away")
-	https                    = []byte("https")
-	apiHost                  = []byte("api.vk.com")
-	siteHost                 = []byte("vk.com")
-	siteHostRoot             = []byte(".vk.com")
-)
-
 var client = &fasthttp.Client{
 	Name: "vk-proxy",
 }
-var domains = make(map[string]*DomainConfig)
+var domains = make(map[string]*domainConfig)
 var json = jsoniter.ConfigFastest
 
-func getDomainConfig(domain string) *DomainConfig {
+func getDomainConfig(domain string) *domainConfig {
 	cfg, ok := domains[domain]
 	if !ok {
-		cfg = &DomainConfig{}
+		cfg = &domainConfig{}
 		cfg.apiReplaces = []replace{
 			newStringReplace(`"https:\/\/vk.com\/video_hls.php`, `"https:\/\/`+domain+`\/@vk.com\/video_hls.php`),
 			newRegexReplace(`"https:\\/\\/([-_a-zA-Z0-9]+\.(?:userapi\.com|vk-cdn\.net|vk\.(?:me|com)|vkuser(?:live|video|audio)\.(?:net|com)))\\/`, `"https:\/\/`+domain+`\/_\/$1\/`),
@@ -105,7 +51,7 @@ func reverseProxyHandler(ctx *fasthttp.RequestCtx) {
 		}
 	}()
 
-	var config *DomainConfig
+	var config *domainConfig
 	if Config.domain != "" {
 		config = getDomainConfig(Config.domain)
 	} else {
@@ -124,7 +70,12 @@ func reverseProxyHandler(ctx *fasthttp.RequestCtx) {
 		return
 	}
 
-	if err := client.DoTimeout(&ctx.Request, &ctx.Response, 30*time.Second); err != nil {
+	err := client.DoTimeout(&ctx.Request, &ctx.Response, 30*time.Second)
+	if err == nil {
+		err = postResponse(config, ctx)
+	}
+
+	if err != nil {
 		ctx.Logger().Printf("error when proxying the request: %s", err)
 		ctx.Response.Reset()
 		if strings.Contains(err.Error(), "timed out") || strings.Contains(err.Error(), "timeout") {
@@ -135,8 +86,6 @@ func reverseProxyHandler(ctx *fasthttp.RequestCtx) {
 			ctx.SetBodyString("500 Internal Server Error")
 		}
 		trackRequest(ctx, 0)
-	} else {
-		postResponse(config, ctx)
 	}
 }
 
@@ -170,15 +119,29 @@ func preRequest(ctx *fasthttp.RequestCtx) bool {
 	}
 	// After req.URI() call it is impossible to modify URI
 	req.URI().SetSchemeBytes(https)
-	req.Header.Del("Accept-Encoding")
+	if Config.gzipUpstream {
+		req.Header.SetBytesKV(acceptEncoding, gzip)
+	} else {
+		req.Header.DelBytes(acceptEncoding)
+	}
 	return true
 }
 
-func postResponse(config *DomainConfig, ctx *fasthttp.RequestCtx) {
-	uri := ctx.Request.URI()
+func postResponse(config *domainConfig, ctx *fasthttp.RequestCtx) error {
 	res := &ctx.Response
-	res.Header.Del("Set-Cookie")
-	body := res.Body()
+	res.Header.DelBytes(setCookie)
+	var body []byte
+	if bytes.Contains(res.Header.PeekBytes(contentEncoding), gzip) {
+		res.Header.DelBytes(contentEncoding)
+		var err error
+		body, err = res.BodyGunzip()
+		if err != nil {
+			return err
+		}
+	} else {
+		body = res.Body()
+	}
+	uri := ctx.Request.URI()
 	path := uri.Path()
 
 	if bytes.Equal(uri.Host(), siteHost) {
@@ -229,6 +192,7 @@ func postResponse(config *DomainConfig, ctx *fasthttp.RequestCtx) {
 	}
 
 	trackRequest(ctx, len(body))
+	return nil
 }
 
 func filterFeed(items []interface{}) ([]interface{}, bool) {

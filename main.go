@@ -19,6 +19,7 @@ var Config struct {
 	reduceMemoryUsage bool
 	removeAdsFromFeed bool
 	debug             bool
+	gzipUpstream      bool
 }
 
 func main() {
@@ -33,6 +34,7 @@ func main() {
 	flag.BoolVar(&Config.logRequests, "log-requests", false, "print every request to the log")
 	flag.BoolVar(&Config.reduceMemoryUsage, "reduce-memory-usage", false, "reduces memory usage at the cost of higher CPU usage")
 	flag.BoolVar(&Config.removeAdsFromFeed, "remove-ads-from-feed", true, "when enabled, ads from feed will be removed")
+	flag.BoolVar(&Config.gzipUpstream, "gzip-upstream", true, "use gzip for requests to api.vk.com")
 
 	iniflags.Parse()
 
