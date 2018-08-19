@@ -27,10 +27,19 @@ var json = jsoniter.ConfigFastest
 func getDomainConfig(domain string) *domainConfig {
 	cfg, ok := domains[domain]
 	if !ok {
+		var replacementStart = []byte(`\/\/` + domain + `\/_\/`)
 		cfg = &domainConfig{}
 		cfg.apiReplaces = []replace{
 			newStringReplace(`"https:\/\/vk.com\/video_hls.php`, `"https:\/\/`+domain+`\/@vk.com\/video_hls.php`),
-			newRegexReplace(`"https:\\/\\/(pu\.vk\.com|[-_a-zA-Z0-9]+\.(?:userapi\.com|vk-cdn\.net|vk\.me|vkuser(?:live|video|audio)\.(?:net|com)))\\/`, `"https:\/\/`+domain+`\/_\/$1\/`),
+			newRegexFastReplace(`\\/\\/(?:pu\.vk\.com|[-_a-zA-Z0-9]{1,15}\.(?:userapi\.com|vk-cdn\.net|vk\.me|vkuser(?:live|video|audio)\.(?:net|com)))\\/`,
+				func(src, dst []byte, start, end int) []byte {
+					if start < 7 || !bytes.Equal(src[start-7:start], jsonUrlPrefix) {
+						return append(dst, src[start:end]...)
+					}
+					dst = append(dst, replacementStart...)
+					dst = append(dst, src[start+4:end]...)
+					return dst
+				}),
 			newRegexReplace(`"https:\\/\\/vk\.com\\/(images\\/|doc-?[0-9]+_)`, `"https:\/\/`+domain+`\/_\/vk.com\/$1`),
 		}
 		cfg.apiOfficialLongpollReplace = newStringReplace(`"server":"api.vk.com\/newuim`, `"server":"`+domain+`\/_\/api.vk.com\/newuim`)
