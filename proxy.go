@@ -139,6 +139,7 @@ func preRequest(ctx *fasthttp.RequestCtx) bool {
 func postResponse(config *domainConfig, ctx *fasthttp.RequestCtx) error {
 	res := &ctx.Response
 	res.Header.DelBytes(setCookie)
+	res.Header.SetBytesKV(serverHeader, vkProxyName)
 	var body []byte
 	if bytes.Contains(res.Header.PeekBytes(contentEncoding), gzip) {
 		res.Header.DelBytes(contentEncoding)

@@ -18,9 +18,11 @@ var (
 	siteHostRoot = []byte(".vk.com")
 
 	gzip            = []byte("gzip")
+	vkProxyName		= []byte("vk-proxy")
 	setCookie       = []byte("Set-Cookie")
 	acceptEncoding  = []byte("Accept-Encoding")
 	contentEncoding = []byte("Content-Encoding")
+	serverHeader    = []byte("Server")
 
 	jsonUrlPrefix = []byte(`"https:`)
 )
