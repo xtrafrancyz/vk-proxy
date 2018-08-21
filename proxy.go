@@ -122,8 +122,10 @@ func (p *Proxy) handleProxy(ctx *fasthttp.RequestCtx) {
 		err = p.processProxyResponse(baseDomain, ctx)
 	}
 
+	elapsed := time.Since(start).Round(100 * time.Microsecond)
+
 	if err != nil {
-		ctx.Logger().Printf("error when proxying the request: %s", err)
+		log.Printf("%s %s error: %s", elapsed, ctx.Path(), err)
 		if strings.Contains(err.Error(), "timed out") || strings.Contains(err.Error(), "timeout") {
 			ctx.Error("408 Request Timeout", 408)
 		} else {
@@ -143,7 +145,6 @@ func (p *Proxy) handleProxy(ctx *fasthttp.RequestCtx) {
 		p.tracker.trackRequest(string(ip), len(ctx.Response.Body()))
 	}
 
-	elapsed := time.Since(start).Round(100 * time.Microsecond)
 	if p.config.LogVerbosity == 2 {
 		log.Printf("%s %s %s", elapsed, ctx.Path(), bytefmt.ByteSize(uint64(len(ctx.Response.Body()))))
 	} else if p.config.LogVerbosity == 3 {
