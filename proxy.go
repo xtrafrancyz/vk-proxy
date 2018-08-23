@@ -216,11 +216,8 @@ type tracker struct {
 }
 
 func (t *tracker) start() {
-	ticker := time.Tick(60 * time.Second)
 	go func() {
-		for {
-			<-ticker
-
+		for range time.Tick(60 * time.Second) {
 			t.lock.Lock()
 			log.Printf("Requests: %d, Traffic: %s, Online: %d", t.requests, bytefmt.ByteSize(t.bytes), len(t.uniqueUsers))
 			t.requests = 0
