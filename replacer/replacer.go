@@ -54,7 +54,7 @@ func (r *Replacer) getDomainConfig(domain string) *domainConfig {
 				cancel:
 					return append(dst, src[start:end]...)
 				}),
-			newRegexReplace(`"https:\\/\\/vk\.com\\/((?:\\/)?images\\/|doc-?[0-9]+_)`, `"https:\/\/`+domain+`\/_\/vk.com\/$1`),
+			newRegexReplace(`"https:\\/\\/vk\.com\\/((?:\\/)?images\\/|stickers_|doc-?[0-9]+_)`, `"https:\/\/`+domain+`\/_\/vk.com\/$1`),
 		}
 		cfg.apiOfficialLongpollReplace = newStringReplace(`"server":"api.vk.com\/newuim`, `"server":"`+domain+`\/_\/api.vk.com\/newuim`)
 		cfg.apiLongpollReplace = newStringReplace(`"server":"`, `"server":"`+domain+`\/_\/`)
