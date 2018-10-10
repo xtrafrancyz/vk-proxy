@@ -14,6 +14,10 @@ import (
 	"github.com/xtrafrancyz/vk-proxy/replacer"
 )
 
+const (
+	readBufferSize = 8192
+)
+
 var (
 	atPath = []byte("/%40")
 
@@ -44,7 +48,8 @@ type Proxy struct {
 func NewProxy(config ProxyConfig) *Proxy {
 	p := &Proxy{
 		client: &fasthttp.Client{
-			Name: "vk-proxy",
+			Name:           "vk-proxy",
+			ReadBufferSize: readBufferSize,
 		},
 		replacer: &replacer.Replacer{},
 		tracker: &tracker{
@@ -55,6 +60,7 @@ func NewProxy(config ProxyConfig) *Proxy {
 	p.server = &fasthttp.Server{
 		Handler:           p.handleProxy,
 		ReduceMemoryUsage: config.ReduceMemoryUsage,
+		ReadBufferSize:    readBufferSize,
 		Name:              "vk-proxy",
 	}
 	if p.config.LogVerbosity > 0 {
