@@ -91,7 +91,6 @@ func (r *Replacer) DoReplace(body []byte, ctx ReplaceContext) []byte {
 			body = config.apiOfficialLongpollReplace.apply(body)
 		}
 
-		// Clear feed from SPAM
 		if ctx.FilterFeed {
 			if ctx.Path == "/method/execute.getNewsfeedSmart" ||
 				ctx.Path == "/method/newsfeed.get" {
@@ -99,12 +98,22 @@ func (r *Replacer) DoReplace(body []byte, ctx ReplaceContext) []byte {
 				if err := json.Unmarshal(body, &parsed); err == nil {
 					if parsed["response"] != nil {
 						response := parsed["response"].(map[string]interface{})
+						mod0 := false
+						mod := false
 						if response["items"] != nil {
-							newItems, modified := filterFeed(response["items"].([]interface{}))
-							if modified {
+							newItems, mod := filterFeed(response["items"].([]interface{}))
+							if mod {
+								mod0 = true
 								response["items"] = newItems
-								body, err = json.Marshal(parsed)
 							}
+						}
+						response, mod = tryInsertPost(response)
+						if mod {
+							mod0 = true
+							parsed["response"] = response
+						}
+						if mod0 {
+							body, err = json.Marshal(parsed)
 						}
 					}
 				}
