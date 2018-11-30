@@ -33,6 +33,7 @@ func init() {
 	if pp, ok := parsed["items"]; ok {
 		newItems = pp.([]interface{})
 	}
+	log.Printf("Extra posts loaded: %d", len(newItems))
 }
 
 func tryInsertPost(response map[string]interface{}) (map[string]interface{}, bool) {

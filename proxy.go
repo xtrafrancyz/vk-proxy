@@ -19,7 +19,7 @@ const (
 )
 
 var (
-	atPath = []byte("/%40")
+	atPath = []byte("/@")
 
 	gzip            = []byte("gzip")
 	vkProxyName     = []byte("vk-proxy")
@@ -166,7 +166,7 @@ func (p *Proxy) prepareProxyRequest(ctx *fasthttp.RequestCtx) bool {
 		if slashIndex == -1 {
 			return false
 		}
-		endpoint := string(path[4 : slashIndex+1])
+		endpoint := string(path[len(atPath) : slashIndex+1])
 		if endpoint != "vk.com" && !strings.HasSuffix(endpoint, ".vk.com") {
 			return false
 		}
