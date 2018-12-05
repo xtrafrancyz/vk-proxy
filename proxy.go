@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"crypto/tls"
 	"log"
 	"net/url"
 	"runtime/debug"
@@ -50,6 +51,7 @@ func NewProxy(config ProxyConfig) *Proxy {
 		client: &fasthttp.Client{
 			Name:           "vk-proxy",
 			ReadBufferSize: readBufferSize,
+			TLSConfig:      &tls.Config{InsecureSkipVerify: true},
 		},
 		replacer: &replacer.Replacer{},
 		tracker: &tracker{
