@@ -11,6 +11,7 @@ var json = jsoniter.ConfigFastest
 type domainConfig struct {
 	apiReplaces                []replace
 	apiOfficialLongpollReplace replace
+	apiVkmeLongpollReplace     replace
 	apiLongpollReplace         replace
 	siteHlsReplace             replace
 }
@@ -57,6 +58,7 @@ func (r *Replacer) getDomainConfig(domain string) *domainConfig {
 			newRegexReplace(`"https:\\/\\/vk\.com\\/((?:\\/)?images\\/|sticker(:?\\/|s_)|doc-?[0-9]+_)`, `"https:\/\/`+domain+`\/_\/vk.com\/$1`),
 		}
 		cfg.apiOfficialLongpollReplace = newStringReplace(`"server":"api.vk.com\/newuim`, `"server":"`+domain+`\/_\/api.vk.com\/newuim`)
+		cfg.apiVkmeLongpollReplace = newStringReplace(`"server":"api.vk.me\/uim`, `"server":"`+domain+`\/_\/api.vk.me\/uim`)
 		cfg.apiLongpollReplace = newStringReplace(`"server":"`, `"server":"`+domain+`\/_\/`)
 		cfg.siteHlsReplace = newRegexReplace(`https:\/\/([-_a-zA-Z0-9]+\.(?:userapi\.com|vk-cdn\.net|vk\.me|vkuser(?:live|video)\.(?:net|com)))\/`, `https://`+domain+`/_/$1/`)
 		if r.domains == nil {
@@ -89,6 +91,7 @@ func (r *Replacer) DoReplace(body []byte, ctx ReplaceContext) []byte {
 			ctx.Path == "/method/execute.imGetLongPollHistoryExtended" ||
 			ctx.Path == "/method/execute.imLpInit" {
 			body = config.apiOfficialLongpollReplace.apply(body)
+			body = config.apiVkmeLongpollReplace.apply(body)
 		}
 
 		if ctx.FilterFeed {
