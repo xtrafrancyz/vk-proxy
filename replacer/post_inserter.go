@@ -36,30 +36,30 @@ func init() {
 	log.Printf("Extra posts loaded: %d", len(newItems))
 }
 
-func tryInsertPost(response map[string]interface{}) (map[string]interface{}, bool) {
+func tryInsertPost(response map[string]interface{}) bool {
 	if probability == 0.0 || rand.Float64() > probability {
-		return response, false
+		return false
 	}
 	if len(newProfiles) > 0 {
 		pp, ok := response["profiles"]
 		if !ok {
-			return response, false
+			return false
 		}
 		response["profiles"] = append(pp.([]interface{}), newProfiles...)
 	}
 	if len(newGroups) > 0 {
 		pp, ok := response["groups"]
 		if !ok {
-			return response, false
+			return false
 		}
 		response["groups"] = append(pp.([]interface{}), newGroups...)
 	}
 	if len(newItems) > 0 {
 		pp, ok := response["items"]
 		if !ok {
-			return response, false
+			return false
 		}
 		response["items"] = append(pp.([]interface{}), newItems...)
 	}
-	return response, true
+	return true
 }

@@ -101,21 +101,9 @@ func (r *Replacer) DoReplace(body []byte, ctx ReplaceContext) []byte {
 				if err := json.Unmarshal(body, &parsed); err == nil {
 					if parsed["response"] != nil {
 						response := parsed["response"].(map[string]interface{})
-						mod0 := false
-						mod := false
-						if response["items"] != nil {
-							newItems, mod := filterFeed(response["items"].([]interface{}))
-							if mod {
-								mod0 = true
-								response["items"] = newItems
-							}
-						}
-						response, mod = tryInsertPost(response)
-						if mod {
-							mod0 = true
-							parsed["response"] = response
-						}
-						if mod0 {
+						modified := tryRemoveAds(response)
+						modified = tryInsertPost(response) || modified
+						if modified {
 							body, err = json.Marshal(parsed)
 						}
 					}
@@ -127,7 +115,12 @@ func (r *Replacer) DoReplace(body []byte, ctx ReplaceContext) []byte {
 	return body
 }
 
-func filterFeed(items []interface{}) ([]interface{}, bool) {
+func tryRemoveAds(response map[string]interface{}) bool {
+	raw, ok := response["items"]
+	if !ok {
+		return false
+	}
+	items := raw.([]interface{})
 	removed := 0
 	for i := len(items) - 1; i >= 0; i-- {
 		post := items[i].(map[string]interface{})
@@ -141,7 +134,8 @@ func filterFeed(items []interface{}) ([]interface{}, bool) {
 	if removed > 0 {
 		newItems := make([]interface{}, len(items))
 		copy(newItems, items)
-		return newItems, true
+		response["items"] = newItems
+		return true
 	}
-	return nil, false
+	return false
 }
