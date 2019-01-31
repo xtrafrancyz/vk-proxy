@@ -1,5 +1,4 @@
-# vk-proxy
-[![Jenkins](https://img.shields.io/jenkins/s/https/ci.xtrafrancyz.net/job/Public/job/vk-proxy.svg)](https://ci.xtrafrancyz.net/job/Public/job/vk-proxy/)
+# vk-proxy [![Uptime](https://img.shields.io/uptimerobot/ratio/7/m780088591-4c8a704c43ffe8c145057754.svg)](https://xtrafrancyz.net/unblock-vk) [![Online](https://img.shields.io/badge/endpoint.svg?url=https://other.xtrafrancyz.net/vk-proxy-badge/onlineBadge)](https://xtrafrancyz.net/unblock-vk)
 
 Прокси-сервер для приложения ВКонтакте на Android.
 
