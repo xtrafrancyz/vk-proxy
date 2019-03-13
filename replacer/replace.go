@@ -42,7 +42,6 @@ func (v *regexReplace) apply(input *bytebufferpool.ByteBuffer) *bytebufferpool.B
 		}
 	}
 	output.B = append(output.B, input.B[idxs[l-1][1]:]...)
-	output.Bytes()
 	replaceBufferPool.Put(input)
 	return output
 }
@@ -86,12 +85,13 @@ type stringReplace struct {
 }
 
 func newStringReplace(needle, replace string) *stringReplace {
-	return &stringReplace{
+	r := &stringReplace{
 		needle:      []byte(needle),
-		needleLen:   len(needle),
 		replacement: []byte(replace),
-		replLen:     len(replace),
 	}
+	r.replLen = len(r.replacement)
+	r.needleLen = len(r.needle)
+	return r
 }
 
 func (v *stringReplace) apply(input *bytebufferpool.ByteBuffer) *bytebufferpool.ByteBuffer {
@@ -105,12 +105,13 @@ func (v *stringReplace) apply(input *bytebufferpool.ByteBuffer) *bytebufferpool.
 		matches = append(matches, offset+index)
 		offset += index + v.needleLen
 	}
-	if len(matches) == 0 {
+	l := len(matches)
+	if l == 0 {
 		return input
 	}
 
 	output := replaceBufferPool.Get()
-	neededLength := input.Len() + len(matches)*(v.replLen-v.needleLen)
+	neededLength := input.Len() + l*(v.replLen-v.needleLen)
 	if cap(output.B) < neededLength {
 		replaceBufferPool.Put(output)
 		output = &bytebufferpool.ByteBuffer{}
@@ -128,7 +129,7 @@ func (v *stringReplace) apply(input *bytebufferpool.ByteBuffer) *bytebufferpool.
 		}
 		offset += copy(output.B[offset:], v.replacement)
 	}
-	offset += copy(output.B[offset:], input.B[matches[len(matches)-1]+v.needleLen:])
+	offset += copy(output.B[offset:], input.B[matches[l-1]+v.needleLen:])
 	output.B = output.B[0:offset]
 
 	replaceBufferPool.Put(input)
