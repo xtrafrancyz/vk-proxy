@@ -4,6 +4,7 @@ import (
 	"bytes"
 
 	"github.com/json-iterator/go"
+	"github.com/valyala/bytebufferpool"
 )
 
 var json = jsoniter.ConfigFastest
@@ -39,7 +40,7 @@ func (r *Replacer) getDomainConfig(domain string) *domainConfig {
 		cfg = &domainConfig{}
 		cfg.apiReplaces = []replace{
 			newStringReplace(`"https:\/\/vk.com\/video_hls.php`, `"https:\/\/`+domain+`\/@vk.com\/video_hls.php`),
-			newRegexFastReplace(`\\/\\/[-_a-zA-Z0-9]{1,15}\.(?:userapi\.com|vk-cdn\.net|vk\.(?:me|com)|vkuser(?:live|video|audio)\.(?:net|com))\\/`,
+			newRegexFuncReplace(`\\/\\/[-_a-zA-Z0-9]{1,15}\.(?:userapi\.com|vk-cdn\.net|vk\.(?:me|com)|vkuser(?:live|video|audio)\.(?:net|com))\\/`,
 				func(src, dst []byte, start, end int) []byte {
 					// check if url has valid prefix (like in regexp backreference)
 					if start < 7 || !bytes.Equal(src[start-7:start], jsonUrlPrefix) {
@@ -69,42 +70,42 @@ func (r *Replacer) getDomainConfig(domain string) *domainConfig {
 	return cfg
 }
 
-func (r *Replacer) DoReplace(body []byte, ctx ReplaceContext) []byte {
+func (r *Replacer) DoReplace(buffer *bytebufferpool.ByteBuffer, ctx ReplaceContext) *bytebufferpool.ByteBuffer {
 	config := r.getDomainConfig(ctx.BaseDomain)
 
 	if ctx.Domain == "vk.com" {
 		if ctx.Path == "/video_hls.php" {
-			body = config.siteHlsReplace.apply(body)
+			buffer = config.siteHlsReplace.apply(buffer)
 		}
 	} else {
 		for _, replace := range config.apiReplaces {
-			body = replace.apply(body)
+			buffer = replace.apply(buffer)
 		}
 
 		// Replace longpoll server
 		if ctx.Path == "/method/messages.getLongPollServer" {
-			body = config.apiLongpollReplace.apply(body)
+			buffer = config.apiLongpollReplace.apply(buffer)
 		} else
 
 		// Replace longpoll server for official app
 		if ctx.Path == "/method/execute" ||
 			ctx.Path == "/method/execute.imGetLongPollHistoryExtended" ||
 			ctx.Path == "/method/execute.imLpInit" {
-			body = config.apiOfficialLongpollReplace.apply(body)
-			body = config.apiVkmeLongpollReplace.apply(body)
+			buffer = config.apiOfficialLongpollReplace.apply(buffer)
+			buffer = config.apiVkmeLongpollReplace.apply(buffer)
 		}
 
 		if ctx.FilterFeed {
 			if ctx.Path == "/method/execute.getNewsfeedSmart" ||
 				ctx.Path == "/method/newsfeed.get" {
 				var parsed map[string]interface{}
-				if err := json.Unmarshal(body, &parsed); err == nil {
+				if err := json.Unmarshal(buffer.B, &parsed); err == nil {
 					if parsed["response"] != nil {
 						response := parsed["response"].(map[string]interface{})
 						modified := tryRemoveAds(response)
 						modified = tryInsertPost(response) || modified
 						if modified {
-							body, err = json.Marshal(parsed)
+							buffer.B, err = json.Marshal(parsed)
 						}
 					}
 				}
@@ -112,7 +113,7 @@ func (r *Replacer) DoReplace(body []byte, ctx ReplaceContext) []byte {
 		}
 	}
 
-	return body
+	return buffer
 }
 
 func tryRemoveAds(response map[string]interface{}) bool {
@@ -138,4 +139,12 @@ func tryRemoveAds(response map[string]interface{}) bool {
 		return true
 	}
 	return false
+}
+
+func AcquireBuffer() *bytebufferpool.ByteBuffer {
+	return replaceBufferPool.Get()
+}
+
+func ReleaseBuffer(buffer *bytebufferpool.ByteBuffer) {
+	replaceBufferPool.Put(buffer)
 }

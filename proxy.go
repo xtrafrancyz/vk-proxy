@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"code.cloudfoundry.org/bytefmt"
+	"github.com/valyala/bytebufferpool"
 	"github.com/valyala/fasthttp"
 	"github.com/xtrafrancyz/vk-proxy/replacer"
 )
@@ -192,27 +193,32 @@ func (p *Proxy) processProxyResponse(baseDomain string, ctx *fasthttp.RequestCtx
 	res.Header.DelBytes(setCookie)
 	res.Header.SetBytesKV(serverHeader, vkProxyName)
 
-	var body []byte
+	var buf *bytebufferpool.ByteBuffer
 	// Gunzip body if needed
 	if bytes.Contains(res.Header.PeekBytes(contentEncoding), gzip) {
 		res.Header.DelBytes(contentEncoding)
 		var err error
-		body, err = res.BodyGunzip()
+		buf = &bytebufferpool.ByteBuffer{}
+		buf.B, err = res.BodyGunzip()
 		if err != nil {
 			return err
 		}
 	} else {
-		body = res.Body()
+		// copy the body, otherwise the fasthttp's internal buffer will be broken
+		buf = replacer.AcquireBuffer()
+		buf.Set(res.Body())
 	}
 
-	body = p.replacer.DoReplace(body, replacer.ReplaceContext{
+	buf = p.replacer.DoReplace(buf, replacer.ReplaceContext{
 		BaseDomain: baseDomain,
 		Domain:     string(ctx.Host()),
 		Path:       string(ctx.Path()),
 		FilterFeed: p.config.FilterFeed,
 	})
 
-	res.SetBody(body)
+	// avoid copying and save old buffer
+	buf.B = res.SwapBody(buf.B)
+	replacer.ReleaseBuffer(buf)
 	return nil
 }
 

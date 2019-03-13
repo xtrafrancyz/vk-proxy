@@ -3,10 +3,16 @@ package replacer
 import (
 	"bytes"
 	"regexp"
+
+	"github.com/valyala/bytebufferpool"
+)
+
+var (
+	replaceBufferPool bytebufferpool.Pool
 )
 
 type replace interface {
-	apply(data []byte) []byte
+	apply(input *bytebufferpool.ByteBuffer) *bytebufferpool.ByteBuffer
 }
 
 type regexReplace struct {
@@ -21,51 +27,110 @@ func newRegexReplace(regex, replace string) *regexReplace {
 	}
 }
 
-func (v *regexReplace) apply(data []byte) []byte {
-	return v.regex.ReplaceAll(data, v.replacement)
+func (v *regexReplace) apply(input *bytebufferpool.ByteBuffer) *bytebufferpool.ByteBuffer {
+	idxs := v.regex.FindAllSubmatchIndex(input.B, -1)
+	l := len(idxs)
+	if l == 0 {
+		return input
+	}
+	output := replaceBufferPool.Get()
+	output.B = append(output.B, input.B[:idxs[0][0]]...)
+	for i, pair := range idxs {
+		output.B = v.regex.Expand(output.B, v.replacement, input.B, pair)
+		if i+1 < l {
+			output.B = append(output.B, input.B[pair[1]:idxs[i+1][0]]...)
+		}
+	}
+	output.B = append(output.B, input.B[idxs[l-1][1]:]...)
+	output.Bytes()
+	replaceBufferPool.Put(input)
+	return output
 }
 
-type regexFastReplace struct {
+type regexFuncReplace struct {
 	regex    *regexp.Regexp
 	replacer func(src, dst []byte, start, end int) []byte
 }
 
-func newRegexFastReplace(regex string, replacer func(src, dst []byte, start, end int) []byte) *regexFastReplace {
-	return &regexFastReplace{
+func newRegexFuncReplace(regex string, replacer func(src, dst []byte, start, end int) []byte) *regexFuncReplace {
+	return &regexFuncReplace{
 		regex:    regexp.MustCompile(regex),
 		replacer: replacer,
 	}
 }
 
-func (v *regexFastReplace) apply(data []byte) []byte {
-	idxs := v.regex.FindAllIndex(data, -1)
+func (v *regexFuncReplace) apply(input *bytebufferpool.ByteBuffer) *bytebufferpool.ByteBuffer {
+	idxs := v.regex.FindAllIndex(input.B, -1)
 	l := len(idxs)
 	if l == 0 {
-		return data
+		return input
 	}
-	ret := append([]byte{}, data[:idxs[0][0]]...)
+	output := replaceBufferPool.Get()
+	output.B = append(output.B, input.B[:idxs[0][0]]...)
 	for i, pair := range idxs {
-		ret = v.replacer(data, ret, pair[0], pair[1])
+		output.B = v.replacer(input.B, output.B, pair[0], pair[1])
 		if i+1 < l {
-			ret = append(ret, data[pair[1]:idxs[i+1][0]]...)
+			output.B = append(output.B, input.B[pair[1]:idxs[i+1][0]]...)
 		}
 	}
-	ret = append(ret, data[idxs[l-1][1]:]...)
-	return ret
+	output.B = append(output.B, input.B[idxs[l-1][1]:]...)
+	replaceBufferPool.Put(input)
+	return output
 }
 
 type stringReplace struct {
 	needle      []byte
+	needleLen   int
 	replacement []byte
+	replLen     int
 }
 
 func newStringReplace(needle, replace string) *stringReplace {
 	return &stringReplace{
 		needle:      []byte(needle),
+		needleLen:   len(needle),
 		replacement: []byte(replace),
+		replLen:     len(replace),
 	}
 }
 
-func (v *stringReplace) apply(data []byte) []byte {
-	return bytes.Replace(data, v.needle, v.replacement, -1)
+func (v *stringReplace) apply(input *bytebufferpool.ByteBuffer) *bytebufferpool.ByteBuffer {
+	matches := make([]int, 0, 20)
+	offset := 0
+	for {
+		index := bytes.Index(input.B[offset:], v.needle)
+		if index == -1 {
+			break
+		}
+		matches = append(matches, offset+index)
+		offset += index + v.needleLen
+	}
+	if len(matches) == 0 {
+		return input
+	}
+
+	output := replaceBufferPool.Get()
+	neededLength := input.Len() + len(matches)*(v.replLen-v.needleLen)
+	if cap(output.B) < neededLength {
+		replaceBufferPool.Put(output)
+		output = &bytebufferpool.ByteBuffer{}
+		output.B = make([]byte, neededLength)
+	} else {
+		output.B = output.B[0:neededLength]
+	}
+
+	offset = 0
+	for i, idx := range matches {
+		if i == 0 {
+			offset += copy(output.B[offset:], input.B[0:idx])
+		} else {
+			offset += copy(output.B[offset:], input.B[matches[i-1]+v.needleLen:idx])
+		}
+		offset += copy(output.B[offset:], v.replacement)
+	}
+	offset += copy(output.B[offset:], input.B[matches[len(matches)-1]+v.needleLen:])
+	output.B = output.B[0:offset]
+
+	replaceBufferPool.Put(input)
+	return output
 }
