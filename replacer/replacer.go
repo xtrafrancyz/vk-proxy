@@ -2,9 +2,11 @@ package replacer
 
 import (
 	"bytes"
+	"strings"
 
 	"github.com/json-iterator/go"
 	"github.com/valyala/bytebufferpool"
+	"github.com/valyala/fasthttp"
 )
 
 var json = jsoniter.ConfigFastest
@@ -14,7 +16,14 @@ type domainConfig struct {
 	apiOfficialLongpollReplace replace
 	apiVkmeLongpollReplace     replace
 	apiLongpollReplace         replace
-	siteHlsReplace             replace
+
+	siteHlsReplace replace
+
+	headLocationReplace replace
+
+	vkuiLangsHtml replace
+	vkuiLangsJs   replace
+	vkuiApiJs     replace
 }
 
 type Replacer struct {
@@ -61,7 +70,14 @@ func (r *Replacer) getDomainConfig(domain string) *domainConfig {
 		cfg.apiOfficialLongpollReplace = newStringReplace(`"server":"api.vk.com\/newuim`, `"server":"`+domain+`\/_\/api.vk.com\/newuim`)
 		cfg.apiVkmeLongpollReplace = newStringReplace(`"server":"api.vk.me\/uim`, `"server":"`+domain+`\/_\/api.vk.me\/uim`)
 		cfg.apiLongpollReplace = newStringReplace(`"server":"`, `"server":"`+domain+`\/_\/`)
+
 		cfg.siteHlsReplace = newRegexReplace(`https:\/\/([-_a-zA-Z0-9]+\.(?:userapi\.com|vk-cdn\.net|vk\.me|vkuser(?:live|video)\.(?:net|com)))\/`, `https://`+domain+`/_/$1/`)
+
+		cfg.headLocationReplace = newRegexReplace(`https?://([^/]+)(.*)`, `https://`+domain+`/@$1$2`)
+
+		cfg.vkuiLangsHtml = newRegexReplace(` src="https://(?:vk.com|'[^']+')/js/vkui_lang`, ` src="https://`+domain+`/_/vk.com/js/vkui_lang`)
+		cfg.vkuiLangsJs = newStringReplace(`langpackEntry:"https://vk.com"`, `langpackEntry:"https://`+domain+`/_/vk.com"`)
+		cfg.vkuiApiJs = newStringReplace(`api.vk.com`, domain)
 		if r.domains == nil {
 			r.domains = make(map[string]*domainConfig)
 		}
@@ -70,50 +86,73 @@ func (r *Replacer) getDomainConfig(domain string) *domainConfig {
 	return cfg
 }
 
-func (r *Replacer) DoReplace(buffer *bytebufferpool.ByteBuffer, ctx ReplaceContext) *bytebufferpool.ByteBuffer {
+func (r *Replacer) DoReplace(res *fasthttp.Response, body *bytebufferpool.ByteBuffer, ctx ReplaceContext) *bytebufferpool.ByteBuffer {
 	config := r.getDomainConfig(ctx.BaseDomain)
 
-	if ctx.Domain == "vk.com" {
-		if ctx.Path == "/video_hls.php" {
-			buffer = config.siteHlsReplace.apply(buffer)
-		}
-	} else {
+	if ctx.Domain == "api.vk.com" {
 		for _, replace := range config.apiReplaces {
-			buffer = replace.apply(buffer)
+			body = replace.apply(body)
 		}
 
 		// Replace longpoll server
 		if ctx.Path == "/method/messages.getLongPollServer" {
-			buffer = config.apiLongpollReplace.apply(buffer)
+			body = config.apiLongpollReplace.apply(body)
 		} else
 
 		// Replace longpoll server for official app
 		if ctx.Path == "/method/execute" ||
 			ctx.Path == "/method/execute.imGetLongPollHistoryExtended" ||
 			ctx.Path == "/method/execute.imLpInit" {
-			buffer = config.apiOfficialLongpollReplace.apply(buffer)
-			buffer = config.apiVkmeLongpollReplace.apply(buffer)
+			body = config.apiOfficialLongpollReplace.apply(body)
+			body = config.apiVkmeLongpollReplace.apply(body)
 		}
 
 		if ctx.FilterFeed {
 			if ctx.Path == "/method/execute.getNewsfeedSmart" ||
 				ctx.Path == "/method/newsfeed.get" {
 				var parsed map[string]interface{}
-				if err := json.Unmarshal(buffer.B, &parsed); err == nil {
+				if err := json.Unmarshal(body.B, &parsed); err == nil {
 					if parsed["response"] != nil {
 						response := parsed["response"].(map[string]interface{})
 						modified := tryRemoveAds(response)
 						modified = tryInsertPost(response) || modified
 						if modified {
-							buffer.B, err = json.Marshal(parsed)
+							body.B, err = json.Marshal(parsed)
 						}
 					}
 				}
 			}
 		}
+
+	} else if ctx.Domain == "vk.com" {
+		if ctx.Path == "/video_hls.php" {
+			body = config.siteHlsReplace.apply(body)
+		}
+
+	} else if ctx.Domain == "static.vk.com" {
+		location := res.Header.Peek("Location")
+		if location != nil {
+			config := r.getDomainConfig(ctx.BaseDomain)
+			buf := bytebufferpool.Get()
+			buf.Set(location)
+			buf = config.headLocationReplace.apply(buf)
+			res.Header.SetBytesV("Location", buf.Bytes())
+		}
+
+		if strings.HasSuffix(ctx.Path, ".js") {
+			body = config.vkuiApiJs.apply(body)
+			if strings.HasPrefix(ctx.Path, "/community_manage") {
+				body = config.vkuiLangsJs.apply(body)
+			}
+		} else {
+			contentType := string(res.Header.ContentType())
+			if strings.HasPrefix(contentType, "text/html") {
+				body = config.vkuiLangsHtml.apply(body)
+			}
+		}
 	}
 
-	return buffer
+	return body
 }
 
 func tryRemoveAds(response map[string]interface{}) bool {

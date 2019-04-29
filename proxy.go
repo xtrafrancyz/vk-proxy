@@ -209,7 +209,7 @@ func (p *Proxy) processProxyResponse(baseDomain string, ctx *fasthttp.RequestCtx
 		buf.Set(res.Body())
 	}
 
-	buf = p.replacer.DoReplace(buf, replacer.ReplaceContext{
+	buf = p.replacer.DoReplace(res, buf, replacer.ReplaceContext{
 		BaseDomain: baseDomain,
 		Domain:     string(ctx.Host()),
 		Path:       string(ctx.Path()),
