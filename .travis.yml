@@ -1,0 +1,31 @@
+language: go
+go:
+  - 1.11.x
+
+cache: 
+  directories: 
+    - $HOME/.cache/go-build 
+    - $HOME/gopath/pkg/mod
+
+env:
+  - GO111MODULE=on
+
+install: []
+
+script:
+  - GOOS=linux GOARCH=amd64 go build -o vk-proxy-linux-amd64
+
+before_deploy:
+  - GOOS=linux GOARCH=386 go build -o vk-proxy-linux-i386
+  - GOOS=windows GOARCH=386 go build -o vk-proxy.exe
+
+deploy:
+  provider: releases
+  api_key: $GITHUB_RELEASES_OATH_TOKEN
+  file:
+    - vk-proxy-linux-amd64
+    - vk-proxy-linux-i386
+    - vk-proxy.exe
+  skip_cleanup: true
+  on:
+    tags: true
