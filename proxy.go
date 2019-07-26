@@ -21,19 +21,18 @@ const (
 )
 
 var (
-	atPath = []byte("/@")
-
 	gzip            = []byte("gzip")
 	vkProxyName     = []byte("vk-proxy")
+	serverHeader    = []byte("Server")
 	setCookie       = []byte("Set-Cookie")
 	acceptEncoding  = []byte("Accept-Encoding")
 	contentEncoding = []byte("Content-Encoding")
-	serverHeader    = []byte("Server")
 )
 
 type ProxyConfig struct {
 	ReduceMemoryUsage bool
 	BaseDomain        string
+	BaseStaticDomain  string
 	LogVerbosity      int
 	GzipUpstream      bool
 	FilterFeed        bool
@@ -54,7 +53,10 @@ func NewProxy(config ProxyConfig) *Proxy {
 			ReadBufferSize: readBufferSize,
 			TLSConfig:      &tls.Config{InsecureSkipVerify: true},
 		},
-		replacer: &replacer.Replacer{},
+		replacer: &replacer.Replacer{
+			ProxyBaseDomain:   config.BaseDomain,
+			ProxyStaticDomain: config.BaseStaticDomain,
+		},
 		tracker: &tracker{
 			uniqueUsers: make(map[string]bool),
 		},
@@ -114,13 +116,6 @@ func (p *Proxy) handleProxy(ctx *fasthttp.RequestCtx) {
 	}()
 	start := time.Now()
 
-	var baseDomain string
-	if p.config.BaseDomain != "" {
-		baseDomain = p.config.BaseDomain
-	} else {
-		baseDomain = string(ctx.Host())
-	}
-
 	if !p.prepareProxyRequest(ctx) {
 		ctx.Error("400 Bad Request", 400)
 		return
@@ -128,7 +123,7 @@ func (p *Proxy) handleProxy(ctx *fasthttp.RequestCtx) {
 
 	err := p.client.DoTimeout(&ctx.Request, &ctx.Response, 30*time.Second)
 	if err == nil {
-		err = p.processProxyResponse(baseDomain, ctx)
+		err = p.processProxyResponse(ctx)
 	}
 
 	elapsed := time.Since(start).Round(100 * time.Microsecond)
@@ -155,29 +150,52 @@ func (p *Proxy) handleProxy(ctx *fasthttp.RequestCtx) {
 	}
 
 	if p.config.LogVerbosity == 2 {
-		log.Printf("%s %s %s", elapsed, ctx.Path(), bytefmt.ByteSize(uint64(len(ctx.Response.Body()))))
+		log.Printf("%s %s %s%s %s", elapsed, ctx.Request.Header.Method(), ctx.Host(), ctx.Path(),
+			bytefmt.ByteSize(uint64(len(ctx.Response.Body()))))
 	} else if p.config.LogVerbosity == 3 {
-		log.Printf("%s %s %s\n%s", elapsed, ctx.Path(), bytefmt.ByteSize(uint64(len(ctx.Response.Body()))), ctx.Response.Body())
+		log.Printf("%s %s %s%s %s\n%s", elapsed, ctx.Request.Header.Method(), ctx.Host(), ctx.Path(),
+			bytefmt.ByteSize(uint64(len(ctx.Response.Body()))), ctx.Response.Body())
 	}
 }
 
 func (p *Proxy) prepareProxyRequest(ctx *fasthttp.RequestCtx) bool {
+	// Routing
 	req := &ctx.Request
-	path := req.RequestURI()
-	if bytes.HasPrefix(path, atPath) {
-		slashIndex := bytes.IndexRune(path[1:], '/')
+	path := string(req.RequestURI())
+	host := ""
+	if strings.HasPrefix(path, "/@") {
+		slashIndex := strings.IndexByte(path[2:], '/')
 		if slashIndex == -1 {
 			return false
 		}
-		endpoint := string(path[len(atPath) : slashIndex+1])
+		endpoint := path[2 : slashIndex+2]
 		if endpoint != "vk.com" && !strings.HasSuffix(endpoint, ".vk.com") {
 			return false
 		}
-		req.Header.SetHost(endpoint)
-		req.SetRequestURIBytes([]byte(path[1+slashIndex:]))
+		host = endpoint
+		path = path[3+slashIndex:]
+		req.SetRequestURI(path)
+	} else if altHost := req.Header.Peek("Proxy-Host"); altHost != nil {
+		host = string(altHost)
+		switch host {
+		case "static.vk.com":
+		case "oauth.vk.com":
+		default:
+			return false
+		}
+		req.Header.Del("Proxy-Host")
 	} else {
-		req.SetHost("api.vk.com")
+		host = "api.vk.com"
 	}
+	req.SetHost(host)
+
+	// Replace some request data
+	p.replacer.DoReplaceRequest(req, replacer.ReplaceContext{
+		Method: req.Header.Method(),
+		Domain: host,
+		Path:   path,
+	})
+
 	// After req.URI() call it is impossible to modify URI
 	req.URI().SetScheme("https")
 	if p.config.GzipUpstream {
@@ -188,7 +206,7 @@ func (p *Proxy) prepareProxyRequest(ctx *fasthttp.RequestCtx) bool {
 	return true
 }
 
-func (p *Proxy) processProxyResponse(baseDomain string, ctx *fasthttp.RequestCtx) error {
+func (p *Proxy) processProxyResponse(ctx *fasthttp.RequestCtx) error {
 	res := &ctx.Response
 	res.Header.DelBytes(setCookie)
 	res.Header.SetBytesKV(serverHeader, vkProxyName)
@@ -209,8 +227,8 @@ func (p *Proxy) processProxyResponse(baseDomain string, ctx *fasthttp.RequestCtx
 		buf.Set(res.Body())
 	}
 
-	buf = p.replacer.DoReplace(res, buf, replacer.ReplaceContext{
-		BaseDomain: baseDomain,
+	buf = p.replacer.DoReplaceResponse(res, buf, replacer.ReplaceContext{
+		Method:     ctx.Method(),
 		Domain:     string(ctx.Host()),
 		Path:       string(ctx.Path()),
 		FilterFeed: p.config.FilterFeed,
