@@ -121,6 +121,7 @@ func (r *Replacer) DoReplaceRequest(req *fasthttp.Request, ctx ReplaceContext) {
 					req.SetHost("oauth.vk.com")
 				}
 			}
+			fasthttp.ReleaseURI(uri)
 		}
 	}
 }
