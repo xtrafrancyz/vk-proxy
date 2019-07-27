@@ -27,8 +27,6 @@ var (
 	setCookie       = []byte("Set-Cookie")
 	acceptEncoding  = []byte("Accept-Encoding")
 	contentEncoding = []byte("Content-Encoding")
-	pathAway        = []byte("/away")
-	pathAwayPhp     = []byte("/away.php")
 )
 
 type ProxyConfig struct {
@@ -105,11 +103,10 @@ func (p *Proxy) handleProxy(ctx *fasthttp.RequestCtx) {
 		return
 	}
 
-	if replaceContext.Host == "api.vk.com" {
-		if bytes.Equal(ctx.Path(), pathAway) || bytes.Equal(ctx.Path(), pathAwayPhp) {
-			p.handleAway(ctx)
-			return
-		}
+	if replaceContext.Host == "api.vk.com" &&
+		(replaceContext.Path == "/away" || replaceContext.Path == "/away.php") {
+		p.handleAway(ctx)
+		return
 	}
 
 	err := p.client.DoTimeout(&ctx.Request, &ctx.Response, 30*time.Second)
