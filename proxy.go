@@ -166,20 +166,20 @@ func (p *Proxy) handleAway(ctx *fasthttp.RequestCtx) {
 func (p *Proxy) prepareProxyRequest(ctx *fasthttp.RequestCtx, replaceContext *replacer.ReplaceContext) bool {
 	// Routing
 	req := &ctx.Request
-	path := string(req.RequestURI())
+	uri := string(req.RequestURI())
 	host := ""
-	if strings.HasPrefix(path, "/@") {
-		slashIndex := strings.IndexByte(path[2:], '/')
+	if strings.HasPrefix(uri, "/@") {
+		slashIndex := strings.IndexByte(uri[2:], '/')
 		if slashIndex == -1 {
 			return false
 		}
-		endpoint := path[2 : slashIndex+2]
+		endpoint := uri[2 : slashIndex+2]
 		if endpoint != "vk.com" && !strings.HasSuffix(endpoint, ".vk.com") {
 			return false
 		}
 		host = endpoint
-		path = path[3+slashIndex:]
-		req.SetRequestURI(path)
+		uri = uri[3+slashIndex:]
+		req.SetRequestURI(uri)
 	} else if altHost := req.Header.Peek("Proxy-Host"); altHost != nil {
 		host = string(altHost)
 		switch host {
@@ -196,7 +196,7 @@ func (p *Proxy) prepareProxyRequest(ctx *fasthttp.RequestCtx, replaceContext *re
 
 	// Replace some request data
 	replaceContext.Host = host
-	replaceContext.Path = path
+	replaceContext.Path = string(ctx.Path())
 	p.replacer.DoReplaceRequest(req, replaceContext)
 
 	// After req.URI() call it is impossible to modify URI

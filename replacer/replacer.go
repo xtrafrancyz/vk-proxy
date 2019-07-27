@@ -107,9 +107,8 @@ func (r *Replacer) DoReplaceRequest(req *fasthttp.Request, ctx *ReplaceContext) 
 		// совпадает.
 		// Зачем такие костыли - никто не знает, но нужно их обходить.
 		// Если в запросе авторизации используется проксируемый статик домен - заменяем его на оригинальный.
-		if strings.HasPrefix(ctx.Path, "/authorize?") {
-			uri := fasthttp.AcquireURI()
-			uri.Update(ctx.Path)
+		if ctx.Path == "/authorize" {
+			uri := req.URI()
 			args := uri.QueryArgs()
 			sourceUrl := args.Peek("source_url")
 			if sourceUrl != nil {
@@ -117,11 +116,8 @@ func (r *Replacer) DoReplaceRequest(req *fasthttp.Request, ctx *ReplaceContext) 
 				modified := strings.Replace(sourceUrls, r.ProxyStaticDomain, "static.vk.com", 1)
 				if modified != sourceUrls {
 					args.Set("source_url", modified)
-					req.SetRequestURIBytes(uri.RequestURI())
-					req.SetHost("oauth.vk.com")
 				}
 			}
-			fasthttp.ReleaseURI(uri)
 		}
 	}
 }
