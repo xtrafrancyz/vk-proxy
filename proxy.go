@@ -27,6 +27,8 @@ var (
 	setCookie       = []byte("Set-Cookie")
 	acceptEncoding  = []byte("Accept-Encoding")
 	contentEncoding = []byte("Content-Encoding")
+	pathAway        = []byte("/away")
+	pathAwayPhp     = []byte("/away.php")
 )
 
 type ProxyConfig struct {
@@ -84,29 +86,6 @@ func (p *Proxy) ListenUnix(path string) error {
 	return p.server.ListenAndServeUNIX(path, 0777)
 }
 
-func (p *Proxy) handler(ctx *fasthttp.RequestCtx) {
-	switch string(ctx.Path()) {
-	case "/away", "/away.php":
-		p.handleAway(ctx)
-	default:
-		p.handleProxy(ctx)
-	}
-}
-
-func (p *Proxy) handleAway(ctx *fasthttp.RequestCtx) {
-	to := string(ctx.QueryArgs().Peek("to"))
-	if to == "" {
-		ctx.Error("Bad Request: 'to' argument is not set", 400)
-		return
-	}
-	to, err := url.QueryUnescape(to)
-	if err != nil {
-		ctx.Error("Bad Request: could not unescape url", 400)
-		return
-	}
-	ctx.Redirect(to, fasthttp.StatusMovedPermanently)
-}
-
 func (p *Proxy) handleProxy(ctx *fasthttp.RequestCtx) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -116,14 +95,26 @@ func (p *Proxy) handleProxy(ctx *fasthttp.RequestCtx) {
 	}()
 	start := time.Now()
 
-	if !p.prepareProxyRequest(ctx) {
+	replaceContext := &replacer.ReplaceContext{
+		Method:     ctx.Method(),
+		FilterFeed: p.config.FilterFeed,
+	}
+
+	if !p.prepareProxyRequest(ctx, replaceContext) {
 		ctx.Error("400 Bad Request", 400)
 		return
 	}
 
+	if replaceContext.Host == "api.vk.com" {
+		if bytes.Equal(ctx.Path(), pathAway) || bytes.Equal(ctx.Path(), pathAwayPhp) {
+			p.handleAway(ctx)
+			return
+		}
+	}
+
 	err := p.client.DoTimeout(&ctx.Request, &ctx.Response, 30*time.Second)
 	if err == nil {
-		err = p.processProxyResponse(ctx)
+		err = p.processProxyResponse(ctx, replaceContext)
 	}
 
 	elapsed := time.Since(start).Round(100 * time.Microsecond)
@@ -158,7 +149,21 @@ func (p *Proxy) handleProxy(ctx *fasthttp.RequestCtx) {
 	}
 }
 
-func (p *Proxy) prepareProxyRequest(ctx *fasthttp.RequestCtx) bool {
+func (p *Proxy) handleAway(ctx *fasthttp.RequestCtx) {
+	to := string(ctx.QueryArgs().Peek("to"))
+	if to == "" {
+		ctx.Error("Bad Request: 'to' argument is not set", 400)
+		return
+	}
+	to, err := url.QueryUnescape(to)
+	if err != nil {
+		ctx.Error("Bad Request: could not unescape url", 400)
+		return
+	}
+	ctx.Redirect(to, fasthttp.StatusMovedPermanently)
+}
+
+func (p *Proxy) prepareProxyRequest(ctx *fasthttp.RequestCtx, replaceContext *replacer.ReplaceContext) bool {
 	// Routing
 	req := &ctx.Request
 	path := string(req.RequestURI())
@@ -190,11 +195,9 @@ func (p *Proxy) prepareProxyRequest(ctx *fasthttp.RequestCtx) bool {
 	req.SetHost(host)
 
 	// Replace some request data
-	p.replacer.DoReplaceRequest(req, replacer.ReplaceContext{
-		Method: req.Header.Method(),
-		Domain: host,
-		Path:   path,
-	})
+	replaceContext.Host = host
+	replaceContext.Path = path
+	p.replacer.DoReplaceRequest(req, replaceContext)
 
 	// After req.URI() call it is impossible to modify URI
 	req.URI().SetScheme("https")
@@ -206,7 +209,7 @@ func (p *Proxy) prepareProxyRequest(ctx *fasthttp.RequestCtx) bool {
 	return true
 }
 
-func (p *Proxy) processProxyResponse(ctx *fasthttp.RequestCtx) error {
+func (p *Proxy) processProxyResponse(ctx *fasthttp.RequestCtx, replaceContext *replacer.ReplaceContext) error {
 	res := &ctx.Response
 	res.Header.DelBytes(setCookie)
 	res.Header.SetBytesKV(serverHeader, vkProxyName)
@@ -227,12 +230,7 @@ func (p *Proxy) processProxyResponse(ctx *fasthttp.RequestCtx) error {
 		buf.Set(res.Body())
 	}
 
-	buf = p.replacer.DoReplaceResponse(res, buf, replacer.ReplaceContext{
-		Method:     ctx.Method(),
-		Domain:     string(ctx.Host()),
-		Path:       string(ctx.Path()),
-		FilterFeed: p.config.FilterFeed,
-	})
+	buf = p.replacer.DoReplaceResponse(res, buf, replaceContext)
 
 	// avoid copying and save old buffer
 	buf.B = res.SwapBody(buf.B)

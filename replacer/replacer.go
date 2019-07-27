@@ -36,7 +36,7 @@ type Replacer struct {
 
 type ReplaceContext struct {
 	Method []byte
-	Domain string
+	Host   string
 	Path   string
 
 	FilterFeed bool
@@ -84,7 +84,7 @@ func (r *Replacer) getDomainConfig() *domainConfig {
 	return r.config
 }
 
-func (r *Replacer) DoReplaceRequest(req *fasthttp.Request, ctx ReplaceContext) {
+func (r *Replacer) DoReplaceRequest(req *fasthttp.Request, ctx *ReplaceContext) {
 	if bytes.Equal(ctx.Method, shared.MethodOptions) {
 		// Заменяем заголовок Origin для CORS на заспросах со страниц VKUI
 		// api.vk.com принимает только "https://static.vk.com" в заголовке Origin
@@ -100,7 +100,7 @@ func (r *Replacer) DoReplaceRequest(req *fasthttp.Request, ctx ReplaceContext) {
 		}
 	}
 
-	if ctx.Domain == "oauth.vk.com" {
+	if ctx.Host == "oauth.vk.com" {
 		// Для авторизации страницы VKUI используют не уже готовый токен авторизации, а получают его при каждом
 		// открытии страницы. В запросе авторизации передается текущий урл страницы VKUI, а так как она проксируется,
 		// то она отличается от оригинальной. ВК проверяет этот урл страницы и отвергает авторизацию если он не
@@ -126,7 +126,7 @@ func (r *Replacer) DoReplaceRequest(req *fasthttp.Request, ctx ReplaceContext) {
 	}
 }
 
-func (r *Replacer) DoReplaceResponse(res *fasthttp.Response, body *bytebufferpool.ByteBuffer, ctx ReplaceContext) *bytebufferpool.ByteBuffer {
+func (r *Replacer) DoReplaceResponse(res *fasthttp.Response, body *bytebufferpool.ByteBuffer, ctx *ReplaceContext) *bytebufferpool.ByteBuffer {
 	config := r.getDomainConfig()
 
 	if bytes.Equal(ctx.Method, shared.MethodOptions) {
@@ -137,7 +137,7 @@ func (r *Replacer) DoReplaceResponse(res *fasthttp.Response, body *bytebufferpoo
 		return body
 	}
 
-	if ctx.Domain == "api.vk.com" {
+	if ctx.Host == "api.vk.com" {
 		for _, replace := range config.apiReplaces {
 			body = replace.apply(body)
 		}
@@ -172,12 +172,12 @@ func (r *Replacer) DoReplaceResponse(res *fasthttp.Response, body *bytebufferpoo
 			}
 		}
 
-	} else if ctx.Domain == "vk.com" {
+	} else if ctx.Host == "vk.com" {
 		if ctx.Path == "/video_hls.php" {
 			body = config.siteHlsReplace.apply(body)
 		}
 
-	} else if ctx.Domain == "static.vk.com" {
+	} else if ctx.Host == "static.vk.com" {
 		if location := res.Header.Peek("Location"); location != nil {
 			// Абсолютный редирект на статик меняем на относительный
 			locstr := string(location)
