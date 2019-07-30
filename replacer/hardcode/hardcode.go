@@ -111,7 +111,7 @@ func (v *hardcodedDomainReplace) Apply(input *bytebufferpool.ByteBuffer) *bytebu
 		}
 
 		// Чтение домена
-		domainLength := bytes.Index(input.B[offset:offset+maxDomainPartLen*3], escapedSlashStr)
+		domainLength := bytes.Index(input.B[offset:min(inputLen, offset+maxDomainPartLen*3)], escapedSlashStr)
 		if domainLength == -1 {
 			continue
 		}
@@ -236,6 +236,14 @@ func testDomainPart(part []byte) bool {
 
 func max(a, b int) int {
 	if a > b {
+		return a
+	} else {
+		return b
+	}
+}
+
+func min(a, b int) int {
+	if a < b {
 		return a
 	} else {
 		return b
