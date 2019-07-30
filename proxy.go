@@ -222,16 +222,18 @@ func (p *Proxy) processProxyResponse(ctx *fasthttp.RequestCtx, replaceContext *r
 			return err
 		}
 	} else {
-		// copy the body, otherwise the fasthttp's internal buffer will be broken
-		buf = replacer.AcquireBuffer()
-		buf.Set(res.Body())
+		buf = &bytebufferpool.ByteBuffer{
+			B: res.SwapBody(nil),
+		}
 	}
 
 	buf = p.replacer.DoReplaceResponse(res, buf, replaceContext)
 
 	// avoid copying and save old buffer
 	buf.B = res.SwapBody(buf.B)
-	replacer.ReleaseBuffer(buf)
+	if cap(buf.B) > 10 {
+		replacer.ReleaseBuffer(buf)
+	}
 	return nil
 }
 
