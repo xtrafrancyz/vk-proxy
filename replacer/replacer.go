@@ -2,29 +2,31 @@ package replacer
 
 import (
 	"bytes"
+	"github.com/xtrafrancyz/vk-proxy/replacer/hardcode"
 	"strings"
 
 	"github.com/json-iterator/go"
 	"github.com/valyala/bytebufferpool"
 	"github.com/valyala/fasthttp"
+	"github.com/xtrafrancyz/vk-proxy/replacer/x"
 	"github.com/xtrafrancyz/vk-proxy/shared"
 )
 
 var json = jsoniter.ConfigFastest
 
 type domainConfig struct {
-	apiReplaces                []replace
-	apiOfficialLongpollReplace replace
-	apiVkmeLongpollReplace     replace
-	apiLongpollReplace         replace
+	apiGlobalReplace           x.Replace
+	apiOfficialLongpollReplace x.Replace
+	apiVkmeLongpollReplace     x.Replace
+	apiLongpollReplace         x.Replace
 
-	siteHlsReplace replace
+	hlsReplace x.Replace
 
-	headLocationReplace replace
+	headLocationReplace x.Replace
 
-	vkuiLangsHtml replace
-	vkuiLangsJs   replace
-	vkuiApiJs     replace
+	vkuiLangsHtml x.Replace
+	vkuiLangsJs   x.Replace
+	vkuiApiJs     x.Replace
 }
 
 type Replacer struct {
@@ -45,34 +47,16 @@ type ReplaceContext struct {
 func (r *Replacer) getDomainConfig() *domainConfig {
 	if r.config == nil {
 		cfg := &domainConfig{}
-		var replacementStart = []byte(`\/\/` + r.ProxyBaseDomain + `\/_\/`)
-		var jsonUrlPrefix = []byte(`"https:`)
-		cfg = &domainConfig{}
-		cfg.apiReplaces = []replace{
-			newStringReplace(`"https:\/\/vk.com\/video_hls.php`, `"https:\/\/`+r.ProxyBaseDomain+`\/@vk.com\/video_hls.php`),
-			newRegexFuncReplace(`\\/\\/[-_a-zA-Z0-9]{1,15}\.(?:userapi\.com|vk-cdn\.net|vk\.(?:me|com)|vkuser(?:live|video|audio)\.(?:net|com))\\/`,
-				func(src, dst []byte, start, end int) []byte {
-					// check if url has valid prefix (like in regexp backreference)
-					if start < 7 || !bytes.Equal(src[start-7:start], jsonUrlPrefix) {
-						goto cancel
-					}
-					// do not proxy m.vk.com domain (bugged articles)
-					if bytes.Equal(src[start+4:end-2], shared.DomainVkMobile) {
-						goto cancel
-					}
-					dst = append(dst, replacementStart...)
-					dst = append(dst, src[start+4:end]...)
-					return dst
-				cancel:
-					return append(dst, src[start:end]...)
-				}),
-			newRegexReplace(`"https:\\/\\/vk\.com\\/((?:\\/)?images\\/|sticker(:?\\/|s_)|doc-?[0-9]+_)`, `"https:\/\/`+r.ProxyBaseDomain+`\/_\/vk.com\/$1`),
-		}
+		cfg.apiGlobalReplace = hardcode.NewHardcodedDomainReplace(hardcode.HardcodedDomainReplaceConfig{
+			Pool:          replaceBufferPool,
+			SimpleReplace: r.ProxyBaseDomain + `\/_\/`,
+			SmartReplace:  r.ProxyBaseDomain + `\/@`,
+		})
 		cfg.apiOfficialLongpollReplace = newStringReplace(`"server":"api.vk.com\/newuim`, `"server":"`+r.ProxyBaseDomain+`\/_\/api.vk.com\/newuim`)
 		cfg.apiVkmeLongpollReplace = newStringReplace(`"server":"api.vk.me\/uim`, `"server":"`+r.ProxyBaseDomain+`\/_\/api.vk.me\/uim`)
 		cfg.apiLongpollReplace = newStringReplace(`"server":"`, `"server":"`+r.ProxyBaseDomain+`\/_\/`)
 
-		cfg.siteHlsReplace = newRegexReplace(`https:\/\/([-_a-zA-Z0-9]+\.(?:userapi\.com|vk-cdn\.net|vk\.me|vkuser(?:live|video)\.(?:net|com)))\/`, `https://`+r.ProxyBaseDomain+`/_/$1/`)
+		cfg.hlsReplace = newRegexReplace(`https:\/\/([-_a-zA-Z0-9]+\.(?:userapi\.com|vk-cdn\.net|vk\.me|vkuser(?:live|video)\.(?:net|com)))\/`, `https://`+r.ProxyBaseDomain+`/_/$1/`)
 
 		cfg.headLocationReplace = newRegexReplace(`https?://([^/]+)(.*)`, `https://`+r.ProxyBaseDomain+`/@$1$2`)
 
@@ -123,6 +107,7 @@ func (r *Replacer) DoReplaceRequest(req *fasthttp.Request, ctx *ReplaceContext) 
 }
 
 func (r *Replacer) DoReplaceResponse(res *fasthttp.Response, body *bytebufferpool.ByteBuffer, ctx *ReplaceContext) *bytebufferpool.ByteBuffer {
+	//log.Printf("BEGIN %s/%s %d", ctx.Host, ctx.Path, body.Len())
 	config := r.getDomainConfig()
 
 	if bytes.Equal(ctx.Method, shared.MethodOptions) {
@@ -134,21 +119,19 @@ func (r *Replacer) DoReplaceResponse(res *fasthttp.Response, body *bytebufferpoo
 	}
 
 	if ctx.Host == "api.vk.com" {
-		for _, replace := range config.apiReplaces {
-			body = replace.apply(body)
-		}
+		body = config.apiGlobalReplace.Apply(body)
 
 		// Replace longpoll server
 		if ctx.Path == "/method/messages.getLongPollServer" {
-			body = config.apiLongpollReplace.apply(body)
+			body = config.apiLongpollReplace.Apply(body)
 		} else
 
 		// Replace longpoll server for official app
 		if ctx.Path == "/method/execute" ||
 			ctx.Path == "/method/execute.imGetLongPollHistoryExtended" ||
 			ctx.Path == "/method/execute.imLpInit" {
-			body = config.apiOfficialLongpollReplace.apply(body)
-			body = config.apiVkmeLongpollReplace.apply(body)
+			body = config.apiOfficialLongpollReplace.Apply(body)
+			body = config.apiVkmeLongpollReplace.Apply(body)
 		}
 
 		if ctx.FilterFeed {
@@ -170,7 +153,7 @@ func (r *Replacer) DoReplaceResponse(res *fasthttp.Response, body *bytebufferpoo
 
 	} else if ctx.Host == "vk.com" {
 		if ctx.Path == "/video_hls.php" {
-			body = config.siteHlsReplace.apply(body)
+			body = config.hlsReplace.Apply(body)
 		}
 
 	} else if ctx.Host == "static.vk.com" {
@@ -188,20 +171,20 @@ func (r *Replacer) DoReplaceResponse(res *fasthttp.Response, body *bytebufferpoo
 			} else {
 				buf := bytebufferpool.Get()
 				buf.Set(location)
-				buf = config.headLocationReplace.apply(buf)
+				buf = config.headLocationReplace.Apply(buf)
 				res.Header.SetBytesV("Location", buf.Bytes())
 			}
 		}
 
 		if strings.HasSuffix(ctx.Path, ".js") {
-			body = config.vkuiApiJs.apply(body)
+			body = config.vkuiApiJs.Apply(body)
 			if strings.HasPrefix(ctx.Path, "/community_manage") {
-				body = config.vkuiLangsJs.apply(body)
+				body = config.vkuiLangsJs.Apply(body)
 			}
 		} else {
 			contentType := string(res.Header.ContentType())
 			if strings.HasPrefix(contentType, "text/html") {
-				body = config.vkuiLangsHtml.apply(body)
+				body = config.vkuiLangsHtml.Apply(body)
 			}
 		}
 	}

@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/valyala/bytebufferpool"
+	"github.com/xtrafrancyz/vk-proxy/replacer/hardcode"
 )
 
 const domain = "vk-api-proxy.xtrafrancyz.net"
@@ -38,6 +39,11 @@ var _regexFuncReplace = newRegexFuncReplace(`\\/\\/[-_a-zA-Z0-9]{1,15}\.(?:usera
 		return append(dst, src[start:end]...)
 	},
 )
+var _hardcodeDomainReplace = hardcode.NewHardcodedDomainReplace(hardcode.HardcodedDomainReplaceConfig{
+	Pool:          replaceBufferPool,
+	SimpleReplace: domain + `\/_\/`,
+	SmartReplace:  domain + `\/@`,
+})
 
 func fillPool() {
 	for i := 0; i < 100; i++ {
@@ -66,7 +72,7 @@ func TestStringReplace(t *testing.T) {
 func testStringReplace(t *testing.T, input, needle, replace string) {
 	buffer := replaceBufferPool.Get()
 	buffer.SetString(input)
-	buffer = newStringReplace(needle, replace).apply(buffer)
+	buffer = newStringReplace(needle, replace).Apply(buffer)
 	if string(buffer.B) != strings.Replace(input, needle, replace, -1) {
 		t.Errorf("%s must replaced to '%s' but got '%s'", input, strings.Replace(input, needle, replace, -1), string(buffer.B))
 	}
@@ -75,7 +81,7 @@ func testStringReplace(t *testing.T, input, needle, replace string) {
 
 func TestRegex(t *testing.T) {
 	buffer := getBufferedData()
-	buffer = _regexReplace.apply(buffer)
+	buffer = _regexReplace.Apply(buffer)
 	if !bytes.Equal(buffer.B, replacedData) {
 		t.Error("Regex replace is not valid")
 	}
@@ -84,9 +90,19 @@ func TestRegex(t *testing.T) {
 
 func TestRegexFunc(t *testing.T) {
 	buffer := getBufferedData()
-	buffer = _regexFuncReplace.apply(buffer)
+	buffer = _regexFuncReplace.Apply(buffer)
 	if !bytes.Equal(buffer.B, replacedData) {
 		t.Error("FuncRegex replace is not valid")
+	}
+	replaceBufferPool.Put(buffer)
+}
+
+func TestHardcode(t *testing.T) {
+	buffer := getBufferedData()
+	buffer = _hardcodeDomainReplace.Apply(buffer)
+	if !bytes.Equal(buffer.B, replacedData) {
+		t.Logf("%s", buffer.B)
+		t.Error("Hardcode replace is not valid")
 	}
 	replaceBufferPool.Put(buffer)
 }
@@ -94,14 +110,21 @@ func TestRegexFunc(t *testing.T) {
 func BenchmarkReplace(b *testing.B) {
 	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
-		replaceBufferPool.Put(_regexReplace.apply(getBufferedData()))
+		replaceBufferPool.Put(_regexReplace.Apply(getBufferedData()))
 	}
 }
 
 func BenchmarkReplaceFunc(b *testing.B) {
 	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
-		replaceBufferPool.Put(_regexFuncReplace.apply(getBufferedData()))
+		replaceBufferPool.Put(_regexFuncReplace.Apply(getBufferedData()))
+	}
+}
+
+func BenchmarkReplaceHardcode(b *testing.B) {
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		replaceBufferPool.Put(_hardcodeDomainReplace.Apply(getBufferedData()))
 	}
 }
 
@@ -118,6 +141,6 @@ func BenchmarkMyStringReplace(b *testing.B) {
 	b.ReportAllocs()
 	replacer := newStringReplace(".com", "bigstring")
 	for i := 0; i < b.N; i++ {
-		replaceBufferPool.Put(replacer.apply(getBufferedData()))
+		replaceBufferPool.Put(replacer.Apply(getBufferedData()))
 	}
 }

@@ -11,10 +11,6 @@ var (
 	replaceBufferPool bytebufferpool.Pool
 )
 
-type replace interface {
-	apply(input *bytebufferpool.ByteBuffer) *bytebufferpool.ByteBuffer
-}
-
 type regexReplace struct {
 	regex       *regexp.Regexp
 	replacement []byte
@@ -27,7 +23,7 @@ func newRegexReplace(regex, replace string) *regexReplace {
 	}
 }
 
-func (v *regexReplace) apply(input *bytebufferpool.ByteBuffer) *bytebufferpool.ByteBuffer {
+func (v *regexReplace) Apply(input *bytebufferpool.ByteBuffer) *bytebufferpool.ByteBuffer {
 	idxs := v.regex.FindAllSubmatchIndex(input.B, -1)
 	l := len(idxs)
 	if l == 0 {
@@ -58,7 +54,7 @@ func newRegexFuncReplace(regex string, replacer func(src, dst []byte, start, end
 	}
 }
 
-func (v *regexFuncReplace) apply(input *bytebufferpool.ByteBuffer) *bytebufferpool.ByteBuffer {
+func (v *regexFuncReplace) Apply(input *bytebufferpool.ByteBuffer) *bytebufferpool.ByteBuffer {
 	idxs := v.regex.FindAllIndex(input.B, -1)
 	l := len(idxs)
 	if l == 0 {
@@ -94,8 +90,8 @@ func newStringReplace(needle, replace string) *stringReplace {
 	return r
 }
 
-func (v *stringReplace) apply(input *bytebufferpool.ByteBuffer) *bytebufferpool.ByteBuffer {
-	matches := make([]int, 0, 20)
+func (v *stringReplace) Apply(input *bytebufferpool.ByteBuffer) *bytebufferpool.ByteBuffer {
+	matches := make([]int, 0, 16)
 	offset := 0
 	for {
 		index := bytes.Index(input.B[offset:], v.needle)
