@@ -2,6 +2,7 @@ package replacer
 
 import (
 	"bytes"
+	"regexp"
 	"strings"
 
 	"github.com/json-iterator/go"
@@ -12,7 +13,11 @@ import (
 	"github.com/xtrafrancyz/vk-proxy/shared"
 )
 
-var json = jsoniter.ConfigFastest
+var (
+	json = jsoniter.ConfigFastest
+
+	httpsStr = []byte("https:")
+)
 
 type domainConfig struct {
 	apiGlobalReplace           x.Replace
@@ -20,7 +25,9 @@ type domainConfig struct {
 	apiVkmeLongpollReplace     x.Replace
 	apiLongpollReplace         x.Replace
 
-	hlsReplace x.Replace
+	hlsReplace      x.Replace
+	m3u8Replace     x.Replace
+	m3u8PathReplace *regexFuncReplace
 
 	headLocationReplace x.Replace
 
@@ -57,6 +64,10 @@ func (r *Replacer) getDomainConfig() *domainConfig {
 		cfg.apiLongpollReplace = newStringReplace(`"server":"`, `"server":"`+r.ProxyBaseDomain+`\/_\/`)
 
 		cfg.hlsReplace = newRegexReplace(`https:\/\/([-_a-zA-Z0-9]+\.(?:userapi\.com|vk-cdn\.net|vk\.me|vkuser(?:live|video)\.(?:net|com)))\/`, `https://`+r.ProxyBaseDomain+`/_/$1/`)
+		cfg.m3u8Replace = newRegexReplace(`https:\/\/([-_a-zA-Z0-9]+\.(?:userapi\.com|vk-cdn\.net|vk\.me|vkuseraudio\.(?:net|com)))\/`, `https://`+r.ProxyBaseDomain+`/_/$1/`)
+		cfg.m3u8PathReplace = &regexFuncReplace{
+			regex: regexp.MustCompile(`(?m)^[^#]`),
+		}
 
 		cfg.headLocationReplace = newRegexReplace(`https?://([^/]+)(.*)`, `https://`+r.ProxyBaseDomain+`/@$1$2`)
 
@@ -185,6 +196,20 @@ func (r *Replacer) DoReplaceResponse(res *fasthttp.Response, body *bytebufferpoo
 			if strings.HasPrefix(contentType, "text/html") {
 				body = config.vkuiLangsHtml.Apply(body)
 			}
+		}
+	} else if strings.HasSuffix(ctx.Host, ".vkuseraudio.net") || strings.HasSuffix(ctx.Host, ".vkuseraudio.com") {
+		if strings.HasSuffix(ctx.Path, ".m3u8") {
+			body = config.m3u8Replace.Apply(body)
+			absolutePath := "https://" + r.ProxyBaseDomain + "/_/" + ctx.Host + ctx.Path[:strings.LastIndexByte(ctx.Path, '/')+1]
+			body = config.m3u8PathReplace.ApplyFunc(body, func(src, dst []byte, start, end int) []byte {
+				// Пропускаем если это абсолютная ссылка
+				if end+5 > cap(src) || bytes.Equal(src[start:end+5], httpsStr) {
+					goto cancel
+				}
+				return append(append(dst, absolutePath...), src[start:end]...)
+			cancel:
+				return append(dst, src[start:end]...)
+			})
 		}
 	}
 

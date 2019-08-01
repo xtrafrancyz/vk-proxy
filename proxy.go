@@ -171,7 +171,10 @@ func (p *Proxy) prepareProxyRequest(ctx *fasthttp.RequestCtx, replaceContext *re
 			return false
 		}
 		endpoint := uri[2 : slashIndex+2]
-		if endpoint != "vk.com" && !strings.HasSuffix(endpoint, ".vk.com") {
+		if endpoint != "vk.com" &&
+			!strings.HasSuffix(endpoint, ".vk.com") &&
+			!strings.HasSuffix(endpoint, ".vkuseraudio.net") &&
+			!strings.HasSuffix(endpoint, ".vkuseraudio.com") {
 			return false
 		}
 		host = endpoint

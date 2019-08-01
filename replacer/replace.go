@@ -56,6 +56,11 @@ func newRegexFuncReplace(regex string, replacer func(src, dst []byte, start, end
 }
 
 func (v *regexFuncReplace) Apply(input *bytebufferpool.ByteBuffer) *bytebufferpool.ByteBuffer {
+	return v.ApplyFunc(input, v.replacer)
+}
+
+func (v *regexFuncReplace) ApplyFunc(input *bytebufferpool.ByteBuffer,
+	f func(src, dst []byte, start, end int) []byte) *bytebufferpool.ByteBuffer {
 	idxs := v.regex.FindAllIndex(input.B, -1)
 	l := len(idxs)
 	if l == 0 {
@@ -64,7 +69,7 @@ func (v *regexFuncReplace) Apply(input *bytebufferpool.ByteBuffer) *bytebufferpo
 	output := AcquireBuffer()
 	output.B = append(output.B, input.B[:idxs[0][0]]...)
 	for i, pair := range idxs {
-		output.B = v.replacer(input.B, output.B, pair[0], pair[1])
+		output.B = f(input.B, output.B, pair[0], pair[1])
 		if i+1 < l {
 			output.B = append(output.B, input.B[pair[1]:idxs[i+1][0]]...)
 		}

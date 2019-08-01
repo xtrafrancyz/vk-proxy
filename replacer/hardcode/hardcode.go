@@ -34,9 +34,9 @@ var (
 	videoStr              = []byte("video")
 	audioStr              = []byte("audio")
 	liveStr               = []byte("live")
+	m3u8Str               = []byte(".m3u8")
 	escapedSlashStr       = []byte(`\/`)
 	escapedDoubleSlashStr = []byte(`\/\/`)
-	dotStr                = []byte(`.`)
 	jsonHttpsStr          = []byte(`"https:`)
 	docPathStr            = []byte(`doc`)
 	imagesPathStr         = []byte(`images\/`)
@@ -73,6 +73,26 @@ type insertion struct {
 	content []byte
 }
 
+type parsedUri struct {
+	host [][]byte
+}
+
+func (u *parsedUri) prepareHost() [][]byte {
+	if u.host == nil {
+		u.host = make([][]byte, 3, 3)
+	} else {
+		u.host = u.host[:3]
+	}
+	return u.host
+}
+
+func (u *parsedUri) getPath(s []byte, offset int) []byte {
+	if offset+5 > len(s) || s[offset] != '\\' {
+		return nil
+	}
+	return s[offset+2:]
+}
+
 // Этот реплейс работает абсолютно так же, как вместе взятые следующие регулярки:
 // - "https:\\/\\/[-_a-zA-Z0-9]{1,15}\.(?:userapi\.com|vk-cdn\.net|vk\.(?:me|com)|vkuser(?:live|video|audio)\.(?:net|com))\\/
 //    -> "https:\/\/proxy_domain\/_\/$1\/
@@ -91,7 +111,7 @@ func NewHardcodedDomainReplace(config HardcodedDomainReplaceConfig) *hardcodedDo
 
 func (v *hardcodedDomainReplace) Apply(input *bytebufferpool.ByteBuffer) *bytebufferpool.ByteBuffer {
 	var output *bytebufferpool.ByteBuffer
-	var host [][]byte
+	var uri parsedUri
 	offset := 0
 	inputLen := len(input.B)
 	var insertions []insertion
@@ -118,28 +138,18 @@ func (v *hardcodedDomainReplace) Apply(input *bytebufferpool.ByteBuffer) *bytebu
 		}
 
 		// Проверка домена на допустимые символы
-		if host == nil {
-			host = make([][]byte, 3, 3)
-		} else {
-			host = host[:cap(host)]
-		}
-		host = split(input.B[offset:offset+domainLength], '.', host)
-		for i := len(host) - 1; i >= 0; i-- {
-			if len(host[i]) > maxDomainPartLen || !testDomainPart(host[i]) {
+		uri.host = split(input.B[offset:offset+domainLength], '.', uri.prepareHost())
+		for _, part := range uri.host {
+			if len(part) > maxDomainPartLen || !testDomainPart(part) {
 				continue
 			}
 		}
 
 		ins := v.simple
 		// Проверка что домен можно проксировать
-		if len(host) == 2 {
-			if bytes.Equal(host[0], vkStr) && bytes.Equal(host[1], comStr) { // vk.com
-				// Слишком короткий путь, гуляем
-				if offset+domainLength+5 > inputLen || input.B[offset+domainLength] != '\\' {
-					continue
-				}
-				path := input.B[offset+domainLength+2:]
-
+		if len(uri.host) == 2 {
+			if bytes.Equal(uri.host[0], vkStr) && bytes.Equal(uri.host[1], comStr) { // vk.com
+				path := uri.getPath(input.B, offset+domainLength)
 				if bytes.HasPrefix(path, docPathStr) { // vk.com/doc[-0-9]*
 					c := path[len(docPathStr)]
 					if c != '-' && !(c >= '0' && c <= '9') {
@@ -161,32 +171,37 @@ func (v *hardcodedDomainReplace) Apply(input *bytebufferpool.ByteBuffer) *bytebu
 			} else {
 				continue
 			}
-		} else if len(host) == 3 {
-			if bytes.Equal(host[1], userapiStr) { // *.userapi.com
-				if !bytes.Equal(host[2], comStr) {
+		} else if len(uri.host) == 3 {
+			if bytes.Equal(uri.host[1], userapiStr) { // *.userapi.com
+				if !bytes.Equal(uri.host[2], comStr) {
 					continue
 				}
-			} else if bytes.Equal(host[1], vkcdnStr) { // *.vk-cdn.net
-				if !bytes.Equal(host[2], netStr) {
+			} else if bytes.Equal(uri.host[1], vkcdnStr) { // *.vk-cdn.net
+				if !bytes.Equal(uri.host[2], netStr) {
 					continue
 				}
-			} else if bytes.Equal(host[1], vkStr) { // *.vk.com
-				if bytes.Equal(host[2], comStr) {
+			} else if bytes.Equal(uri.host[1], vkStr) { // *.vk.com
+				if bytes.Equal(uri.host[2], comStr) {
 					// Домен m.vk.com не проксим
-					if len(host[0]) == 1 && host[0][0] == 'm' {
+					if len(uri.host[0]) == 1 && uri.host[0][0] == 'm' {
 						continue
 					}
-				} else if !bytes.Equal(host[2], meStr) { // *.vk.me
+				} else if !bytes.Equal(uri.host[2], meStr) { // *.vk.me
 					continue
 				} else {
 					continue
 				}
-			} else if bytes.HasPrefix(host[1], vkuserStr) { // *.vkuser(audio|video|live).(net|com)
-				if !bytes.Equal(host[2], comStr) && !bytes.Equal(host[2], netStr) {
+			} else if bytes.HasPrefix(uri.host[1], vkuserStr) { // *.vkuser(audio|video|live).(net|com)
+				if !bytes.Equal(uri.host[2], comStr) && !bytes.Equal(uri.host[2], netStr) {
 					continue
 				}
-				r := host[1][len(vkuserStr):]
-				if !bytes.Equal(r, videoStr) && !bytes.Equal(r, audioStr) && !bytes.Equal(r, liveStr) {
+				r := uri.host[1][len(vkuserStr):]
+				if bytes.Equal(r, audioStr) {
+					path := uri.getPath(input.B, offset+domainLength)
+					if bytes.Contains(path[:min(100, len(path))], m3u8Str) {
+						ins = v.smart
+					}
+				} else if !bytes.Equal(r, videoStr) && !bytes.Equal(r, liveStr) {
 					continue
 				}
 			} else {
@@ -260,14 +275,14 @@ func roundUpToPowerOfTwo(i int) int {
 }
 
 func split(s []byte, sep byte, result [][]byte) [][]byte {
-	n := cap(result) -1
+	n := cap(result) - 1
 	i := 0
 	for i < n {
 		m := bytes.IndexByte(s, sep)
 		if m < 0 {
 			break
 		}
-		result[i] = s[: m : m]
+		result[i] = s[:m:m]
 		s = s[m+1:]
 		i++
 	}
