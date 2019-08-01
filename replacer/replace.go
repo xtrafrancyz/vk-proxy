@@ -3,6 +3,7 @@ package replacer
 import (
 	"bytes"
 	"regexp"
+	"sync"
 
 	"github.com/valyala/bytebufferpool"
 )
@@ -29,7 +30,7 @@ func (v *regexReplace) Apply(input *bytebufferpool.ByteBuffer) *bytebufferpool.B
 	if l == 0 {
 		return input
 	}
-	output := replaceBufferPool.Get()
+	output := AcquireBuffer()
 	output.B = append(output.B, input.B[:idxs[0][0]]...)
 	for i, pair := range idxs {
 		output.B = v.regex.Expand(output.B, v.replacement, input.B, pair)
@@ -38,7 +39,7 @@ func (v *regexReplace) Apply(input *bytebufferpool.ByteBuffer) *bytebufferpool.B
 		}
 	}
 	output.B = append(output.B, input.B[idxs[l-1][1]:]...)
-	replaceBufferPool.Put(input)
+	ReleaseBuffer(input)
 	return output
 }
 
@@ -60,7 +61,7 @@ func (v *regexFuncReplace) Apply(input *bytebufferpool.ByteBuffer) *bytebufferpo
 	if l == 0 {
 		return input
 	}
-	output := replaceBufferPool.Get()
+	output := AcquireBuffer()
 	output.B = append(output.B, input.B[:idxs[0][0]]...)
 	for i, pair := range idxs {
 		output.B = v.replacer(input.B, output.B, pair[0], pair[1])
@@ -69,7 +70,7 @@ func (v *regexFuncReplace) Apply(input *bytebufferpool.ByteBuffer) *bytebufferpo
 		}
 	}
 	output.B = append(output.B, input.B[idxs[l-1][1]:]...)
-	replaceBufferPool.Put(input)
+	ReleaseBuffer(input)
 	return output
 }
 
@@ -91,25 +92,27 @@ func newStringReplace(needle, replace string) *stringReplace {
 }
 
 func (v *stringReplace) Apply(input *bytebufferpool.ByteBuffer) *bytebufferpool.ByteBuffer {
-	matches := make([]int, 0, 16)
+	var matches []int
 	offset := 0
 	for {
 		index := bytes.Index(input.B[offset:], v.needle)
 		if index == -1 {
 			break
 		}
+		if matches == nil {
+			matches = acquireMatches()
+		}
 		matches = append(matches, offset+index)
 		offset += index + v.needleLen
 	}
-	l := len(matches)
-	if l == 0 {
+	if matches == nil {
 		return input
 	}
 
-	output := replaceBufferPool.Get()
-	neededLength := input.Len() + l*(v.replLen-v.needleLen)
+	output := AcquireBuffer()
+	neededLength := input.Len() + len(matches)*(v.replLen-v.needleLen)
 	if cap(output.B) < neededLength {
-		replaceBufferPool.Put(output)
+		ReleaseBuffer(output)
 		output = &bytebufferpool.ByteBuffer{}
 		output.B = make([]byte, neededLength)
 	} else {
@@ -125,9 +128,25 @@ func (v *stringReplace) Apply(input *bytebufferpool.ByteBuffer) *bytebufferpool.
 		}
 		offset += copy(output.B[offset:], v.replacement)
 	}
-	offset += copy(output.B[offset:], input.B[matches[l-1]+v.needleLen:])
+	offset += copy(output.B[offset:], input.B[matches[len(matches)-1]+v.needleLen:])
 	output.B = output.B[0:offset]
 
-	replaceBufferPool.Put(input)
+	releaseMatches(matches)
+	ReleaseBuffer(input)
 	return output
 }
+
+func acquireMatches() []int {
+	v := matchesPool.Get()
+	if v != nil {
+		return v.([]int)
+	}
+	return make([]int, 0, 16)
+}
+
+func releaseMatches(a []int) {
+	a = a[:0]
+	matchesPool.Put(a)
+}
+
+var matchesPool sync.Pool

@@ -2,12 +2,12 @@ package replacer
 
 import (
 	"bytes"
-	"github.com/xtrafrancyz/vk-proxy/replacer/hardcode"
 	"strings"
 
 	"github.com/json-iterator/go"
 	"github.com/valyala/bytebufferpool"
 	"github.com/valyala/fasthttp"
+	"github.com/xtrafrancyz/vk-proxy/replacer/hardcode"
 	"github.com/xtrafrancyz/vk-proxy/replacer/x"
 	"github.com/xtrafrancyz/vk-proxy/shared"
 )
@@ -107,7 +107,6 @@ func (r *Replacer) DoReplaceRequest(req *fasthttp.Request, ctx *ReplaceContext) 
 }
 
 func (r *Replacer) DoReplaceResponse(res *fasthttp.Response, body *bytebufferpool.ByteBuffer, ctx *ReplaceContext) *bytebufferpool.ByteBuffer {
-	//log.Printf("BEGIN %s/%s %d", ctx.Host, ctx.Path, body.Len())
 	config := r.getDomainConfig()
 
 	if bytes.Equal(ctx.Method, shared.MethodOptions) {

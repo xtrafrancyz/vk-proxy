@@ -2,6 +2,7 @@ package hardcode
 
 import (
 	"bytes"
+	"sync"
 	"unicode/utf8"
 
 	"github.com/valyala/bytebufferpool"
@@ -117,7 +118,12 @@ func (v *hardcodedDomainReplace) Apply(input *bytebufferpool.ByteBuffer) *bytebu
 		}
 
 		// Проверка домена на допустимые символы
-		host = bytes.SplitN(input.B[offset:offset+domainLength], dotStr, 3)
+		if host == nil {
+			host = make([][]byte, 3, 3)
+		} else {
+			host = host[:cap(host)]
+		}
+		host = split(input.B[offset:offset+domainLength], '.', host)
 		for i := len(host) - 1; i >= 0; i-- {
 			if len(host[i]) > maxDomainPartLen || !testDomainPart(host[i]) {
 				continue
@@ -190,8 +196,7 @@ func (v *hardcodedDomainReplace) Apply(input *bytebufferpool.ByteBuffer) *bytebu
 			continue
 		}
 		if insertions == nil {
-			// Прикинем что в ответе на каждые 300 байт по одной ссылке
-			insertions = make([]insertion, 0, max(16, roundUpToPowerOfTwo(inputLen/300)))
+			insertions = acquireInsertions()
 		}
 		insertions = append(insertions, insertion{
 			offset:  offset,
@@ -221,6 +226,7 @@ func (v *hardcodedDomainReplace) Apply(input *bytebufferpool.ByteBuffer) *bytebu
 	}
 	output.B = append(output.B, input.B[lastAppend:]...)
 
+	releaseInsertions(insertions)
 	v.pool.Put(input)
 	return output
 }
@@ -232,14 +238,6 @@ func testDomainPart(part []byte) bool {
 		}
 	}
 	return true
-}
-
-func max(a, b int) int {
-	if a > b {
-		return a
-	} else {
-		return b
-	}
 }
 
 func min(a, b int) int {
@@ -259,6 +257,22 @@ func roundUpToPowerOfTwo(i int) int {
 	i |= i >> 8
 	i |= i >> 16
 	return i + 1
+}
+
+func split(s []byte, sep byte, result [][]byte) [][]byte {
+	n := cap(result) -1
+	i := 0
+	for i < n {
+		m := bytes.IndexByte(s, sep)
+		if m < 0 {
+			break
+		}
+		result[i] = s[: m : m]
+		s = s[m+1:]
+		i++
+	}
+	result[i] = s
+	return result[:i+1]
 }
 
 // asciiSet is a 32-byte value, where each bit represents the presence of a
@@ -281,3 +295,18 @@ func (as *asciiSet) add(c byte) bool {
 func (as *asciiSet) contains(c byte) bool {
 	return (as[c>>5] & (1 << uint(c&31))) != 0
 }
+
+func acquireInsertions() []insertion {
+	v := insertionsPool.Get()
+	if v != nil {
+		return v.([]insertion)
+	}
+	return make([]insertion, 0, 32)
+}
+
+func releaseInsertions(a []insertion) {
+	a = a[:0]
+	insertionsPool.Put(a)
+}
+
+var insertionsPool sync.Pool

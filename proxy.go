@@ -27,6 +27,7 @@ var (
 	setCookie       = []byte("Set-Cookie")
 	acceptEncoding  = []byte("Accept-Encoding")
 	contentEncoding = []byte("Content-Encoding")
+	methodOptions   = []byte("OPTIONS")
 )
 
 type ProxyConfig struct {
