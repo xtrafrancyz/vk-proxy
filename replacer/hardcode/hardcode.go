@@ -229,8 +229,6 @@ func (v *hardcodedDomainReplace) Apply(input *bytebufferpool.ByteBuffer) *bytebu
 
 	output = v.pool.Get()
 	if cap(output.B) < neededLength {
-		v.pool.Put(output)
-		output = &bytebufferpool.ByteBuffer{}
 		output.B = make([]byte, 0, neededLength)
 	}
 

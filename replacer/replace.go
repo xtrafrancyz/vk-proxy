@@ -117,8 +117,6 @@ func (v *stringReplace) Apply(input *bytebufferpool.ByteBuffer) *bytebufferpool.
 	output := AcquireBuffer()
 	neededLength := input.Len() + len(matches)*(v.replLen-v.needleLen)
 	if cap(output.B) < neededLength {
-		ReleaseBuffer(output)
-		output = &bytebufferpool.ByteBuffer{}
 		output.B = make([]byte, neededLength)
 	} else {
 		output.B = output.B[0:neededLength]
