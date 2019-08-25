@@ -40,7 +40,7 @@ var _regexFuncReplace = newRegexFuncReplace(`\\/\\/[-_a-zA-Z0-9]{1,15}\.(?:usera
 	},
 )
 var _hardcodeDomainReplace = hardcode.NewHardcodedDomainReplace(hardcode.HardcodedDomainReplaceConfig{
-	Pool:          replaceBufferPool,
+	Pool:          &replaceBufferPool,
 	SimpleReplace: domain + `\/_\/`,
 	SmartReplace:  domain + `\/@`,
 })

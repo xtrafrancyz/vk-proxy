@@ -53,7 +53,7 @@ const (
 )
 
 type HardcodedDomainReplaceConfig struct {
-	Pool bytebufferpool.Pool
+	Pool *bytebufferpool.Pool
 
 	// Домен, который просто пропускает трафик через себя без обработки, обычно domain.com\/_\/
 	SimpleReplace string
@@ -63,7 +63,7 @@ type HardcodedDomainReplaceConfig struct {
 }
 
 type hardcodedDomainReplace struct {
-	pool   bytebufferpool.Pool
+	pool   *bytebufferpool.Pool
 	simple []byte
 	smart  []byte
 }

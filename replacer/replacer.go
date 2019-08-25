@@ -55,7 +55,7 @@ func (r *Replacer) getDomainConfig() *domainConfig {
 	if r.config == nil {
 		cfg := &domainConfig{}
 		cfg.apiGlobalReplace = hardcode.NewHardcodedDomainReplace(hardcode.HardcodedDomainReplaceConfig{
-			Pool:          replaceBufferPool,
+			Pool:          &replaceBufferPool,
 			SimpleReplace: r.ProxyBaseDomain + `\/_\/`,
 			SmartReplace:  r.ProxyBaseDomain + `\/@`,
 		})
