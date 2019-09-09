@@ -178,7 +178,7 @@ func (p *Proxy) prepareProxyRequest(ctx *fasthttp.RequestCtx, replaceContext *re
 			return false
 		}
 		host = endpoint
-		uri = uri[3+slashIndex:]
+		uri = uri[2+slashIndex:]
 		req.SetRequestURI(uri)
 	} else if altHost := req.Header.Peek("Proxy-Host"); altHost != nil {
 		host = string(altHost)

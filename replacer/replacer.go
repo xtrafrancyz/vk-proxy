@@ -16,7 +16,8 @@ import (
 var (
 	json = jsoniter.ConfigFastest
 
-	httpsStr = []byte("https:")
+	httpsStr     = []byte("https:")
+	indexM3u8Str = []byte("/index.m3u8")
 )
 
 type domainConfig struct {
@@ -69,7 +70,7 @@ func (r *Replacer) getDomainConfig() *domainConfig {
 			regex: regexp.MustCompile(`(?m)^[^#]`),
 		}
 
-		cfg.headLocationReplace = newRegexReplace(`https?://([^/]+)(.*)`, `https://`+r.ProxyBaseDomain+`/@$1$2`)
+		cfg.headLocationReplace = newRegexReplace(`^https?://([^/]+)(.*)`, `https://`+r.ProxyBaseDomain+`/@$1$2`)
 
 		cfg.vkuiLangsHtml = newRegexReplace(` src="https://(?:vk.com|'[^']+')/js/vkui_lang`, ` src="https://`+r.ProxyBaseDomain+`/_/vk.com/js/vkui_lang`)
 		cfg.vkuiLangsJs = newStringReplace(`langpackEntry:"https://vk.com"`, `langpackEntry:"https://`+r.ProxyBaseDomain+`/_/vk.com"`)
@@ -164,6 +165,13 @@ func (r *Replacer) DoReplaceResponse(res *fasthttp.Response, body *bytebufferpoo
 	} else if ctx.Host == "vk.com" {
 		if ctx.Path == "/video_hls.php" {
 			body = config.hlsReplace.Apply(body)
+		} else if ctx.Path == "/err404.php" {
+			if location := res.Header.Peek("Location"); location != nil {
+				// Если редирект идет на .m3u8, то редиректим на прокси с заменой
+				if bytes.Contains(location, indexM3u8Str) {
+					replaceLocationHeader(config, location, res)
+				}
+			}
 		}
 
 	} else if ctx.Host == "static.vk.com" {
@@ -179,10 +187,7 @@ func (r *Replacer) DoReplaceResponse(res *fasthttp.Response, body *bytebufferpoo
 				relativeRedirectPath = relativeRedirectPath[longestCommonPrefix(relativeRedirectPath, relativePath):]
 				res.Header.Set("Location", relativeRedirectPath)
 			} else {
-				buf := bytebufferpool.Get()
-				buf.Set(location)
-				buf = config.headLocationReplace.Apply(buf)
-				res.Header.SetBytesV("Location", buf.Bytes())
+				replaceLocationHeader(config, location, res)
 			}
 		}
 
@@ -199,21 +204,34 @@ func (r *Replacer) DoReplaceResponse(res *fasthttp.Response, body *bytebufferpoo
 		}
 	} else if strings.HasSuffix(ctx.Host, ".vkuseraudio.net") || strings.HasSuffix(ctx.Host, ".vkuseraudio.com") {
 		if strings.HasSuffix(ctx.Path, ".m3u8") {
-			body = config.m3u8Replace.Apply(body)
-			absolutePath := "https://" + r.ProxyBaseDomain + "/_/" + ctx.Host + ctx.Path[:strings.LastIndexByte(ctx.Path, '/')+1]
-			body = config.m3u8PathReplace.ApplyFunc(body, func(src, dst []byte, start, end int) []byte {
-				// Пропускаем если это абсолютная ссылка
-				if end+5 > cap(src) || bytes.Equal(src[start:end+5], httpsStr) {
-					goto cancel
-				}
-				return append(append(dst, absolutePath...), src[start:end]...)
-			cancel:
-				return append(dst, src[start:end]...)
-			})
+			if location := res.Header.Peek("Location"); location != nil {
+				replaceLocationHeader(config, location, res)
+			} else {
+				body = config.m3u8Replace.Apply(body)
+				absolutePath := "https://" + r.ProxyBaseDomain + "/_/" + ctx.Host + ctx.Path[:strings.LastIndexByte(ctx.Path, '/')+1]
+				body = config.m3u8PathReplace.ApplyFunc(body, func(src, dst []byte, start, end int) []byte {
+					// Пропускаем если это абсолютная ссылка
+					if end+5 > cap(src) || bytes.Equal(src[start:end+5], httpsStr) {
+						goto cancel
+					}
+					return append(append(dst, absolutePath...), src[start:end]...)
+				cancel:
+					return append(dst, src[start:end]...)
+				})
+			}
 		}
 	}
 
 	return body
+}
+
+func replaceLocationHeader(config *domainConfig, location []byte, res *fasthttp.Response) {
+	// Заменяем абсолютные редиректы на прокси с заменой
+	buf := AcquireBuffer()
+	buf.Set(location)
+	buf = config.headLocationReplace.Apply(buf)
+	res.Header.SetBytesV("Location", buf.Bytes())
+	ReleaseBuffer(buf)
 }
 
 func tryRemoveAds(response map[string]interface{}) bool {
