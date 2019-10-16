@@ -60,8 +60,8 @@ func (r *Replacer) getDomainConfig() *domainConfig {
 			SimpleReplace: r.ProxyBaseDomain + `\/_\/`,
 			SmartReplace:  r.ProxyBaseDomain + `\/@`,
 		})
-		cfg.apiOfficialLongpollReplace = newStringReplace(`"server":"api.vk.com\/newuim`, `"server":"`+r.ProxyBaseDomain+`\/_\/api.vk.com\/newuim`)
-		cfg.apiVkmeLongpollReplace = newStringReplace(`"server":"api.vk.me\/uim`, `"server":"`+r.ProxyBaseDomain+`\/_\/api.vk.me\/uim`)
+		cfg.apiOfficialLongpollReplace = newStringReplace(`"server":"api.vk.com\/`, `"server":"`+r.ProxyBaseDomain+`\/_\/api.vk.com\/`)
+		cfg.apiVkmeLongpollReplace = newStringReplace(`"server":"api.vk.me\/`, `"server":"`+r.ProxyBaseDomain+`\/_\/api.vk.me\/`)
 		cfg.apiLongpollReplace = newStringReplace(`"server":"`, `"server":"`+r.ProxyBaseDomain+`\/_\/`)
 
 		cfg.hlsReplace = newRegexReplace(`https:\/\/([-_a-zA-Z0-9]+\.(?:userapi\.com|vk-cdn\.net|vk\.me|vkuser(?:live|video)\.(?:net|com)))\/`, `https://`+r.ProxyBaseDomain+`/_/$1/`)
