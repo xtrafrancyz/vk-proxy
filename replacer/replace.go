@@ -1,7 +1,9 @@
 package replacer
 
 import (
+	"bufio"
 	"bytes"
+	"io"
 	"regexp"
 	"sync"
 
@@ -25,22 +27,9 @@ func newRegexReplace(regex, replace string) *regexReplace {
 }
 
 func (v *regexReplace) Apply(input *bytebufferpool.ByteBuffer) *bytebufferpool.ByteBuffer {
-	idxs := v.regex.FindAllSubmatchIndex(input.B, -1)
-	l := len(idxs)
-	if l == 0 {
-		return input
-	}
-	output := AcquireBuffer()
-	output.B = append(output.B, input.B[:idxs[0][0]]...)
-	for i, pair := range idxs {
-		output.B = v.regex.Expand(output.B, v.replacement, input.B, pair)
-		if i+1 < l {
-			output.B = append(output.B, input.B[pair[1]:idxs[i+1][0]]...)
-		}
-	}
-	output.B = append(output.B, input.B[idxs[l-1][1]:]...)
-	ReleaseBuffer(input)
-	return output
+	return applyRegexpBytes(v.regex.FindAllSubmatchIndex(input.B, -1), input, func(src, dst []byte, match []int) []byte {
+		return v.regex.Expand(dst, v.replacement, src, match)
+	})
 }
 
 type regexFuncReplace struct {
@@ -61,20 +50,26 @@ func (v *regexFuncReplace) Apply(input *bytebufferpool.ByteBuffer) *bytebufferpo
 
 func (v *regexFuncReplace) ApplyFunc(input *bytebufferpool.ByteBuffer,
 	f func(src, dst []byte, start, end int) []byte) *bytebufferpool.ByteBuffer {
-	idxs := v.regex.FindAllIndex(input.B, -1)
-	l := len(idxs)
+	return applyRegexpBytes(v.regex.FindAllIndex(input.B, -1), input, func(src, dst []byte, match []int) []byte {
+		return f(src, dst, match[0], match[1])
+	})
+}
+
+func applyRegexpBytes(matches [][]int, input *bytebufferpool.ByteBuffer,
+	expand func(src, dst []byte, match []int) []byte) *bytebufferpool.ByteBuffer {
+	l := len(matches)
 	if l == 0 {
 		return input
 	}
 	output := AcquireBuffer()
-	output.B = append(output.B, input.B[:idxs[0][0]]...)
-	for i, pair := range idxs {
-		output.B = f(input.B, output.B, pair[0], pair[1])
+	output.B = append(output.B, input.B[:matches[0][0]]...)
+	for i, match := range matches {
+		output.B = expand(input.B, output.B, match)
 		if i+1 < l {
-			output.B = append(output.B, input.B[pair[1]:idxs[i+1][0]]...)
+			output.B = append(output.B, input.B[match[1]:matches[i+1][0]]...)
 		}
 	}
-	output.B = append(output.B, input.B[idxs[l-1][1]:]...)
+	output.B = append(output.B, input.B[matches[l-1][1]:]...)
 	ReleaseBuffer(input)
 	return output
 }
@@ -137,6 +132,62 @@ func (v *stringReplace) Apply(input *bytebufferpool.ByteBuffer) *bytebufferpool.
 	releaseMatches(matches)
 	ReleaseBuffer(input)
 	return output
+}
+
+func (v *stringReplace) ApplyStream(r *bufio.Reader, w *bufio.Writer) error {
+	for {
+		data, err := r.ReadSlice(v.needle[0])
+		// Нечего заменять, пишем в ответ
+		if err != nil {
+			if len(data) > 0 {
+				_, err = w.Write(data)
+				if err != nil {
+					return err
+				}
+				continue
+			}
+			if err == io.EOF {
+				return nil
+			}
+			return err
+		}
+		// Пишем все что было до найденного
+		_, err = w.Write(data[:len(data)-1])
+		if err != nil {
+			return err
+		}
+
+		// Пробуем считать длину искомой строки
+		buf := make([]byte, v.needleLen-1)
+		n, err := io.ReadFull(r, buf)
+		if err != nil {
+			// Исходник закончился слишком быстро
+			if err == io.ErrUnexpectedEOF {
+				goto skip
+			}
+			return err
+		}
+
+		// Если это искомая строка
+		if bytes.Equal(v.needle[1:], buf) {
+			_, err = w.Write(v.replacement)
+			if err != nil {
+				return err
+			}
+			continue
+		}
+
+	skip:
+		// Иначе пишем все как было
+		err = w.WriteByte(v.needle[0])
+		if err != nil {
+			return err
+		}
+		_, err = w.Write(buf[:n])
+		if err != nil {
+			return err
+		}
+	}
 }
 
 func acquireMatches() []int {
