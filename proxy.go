@@ -10,9 +10,9 @@ import (
 	"sync"
 	"time"
 
-	"code.cloudfoundry.org/bytefmt"
 	"github.com/valyala/bytebufferpool"
 	"github.com/valyala/fasthttp"
+	"github.com/xtrafrancyz/vk-proxy/bytefmt"
 	"github.com/xtrafrancyz/vk-proxy/replacer"
 )
 
