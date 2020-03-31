@@ -218,12 +218,15 @@ func (p *Proxy) processProxyResponse(ctx *fasthttp.RequestCtx, replaceContext *r
 	// Gunzip body if needed
 	if bytes.Contains(res.Header.PeekBytes(contentEncoding), gzip) {
 		res.Header.DelBytes(contentEncoding)
-		var err error
-		buf = &bytebufferpool.ByteBuffer{}
-		buf.B, err = res.BodyGunzip()
+		buf = replacer.AcquireBuffer()
+		_, err := fasthttp.WriteGunzip(buf, res.Body())
 		if err != nil {
+			replacer.ReleaseBuffer(buf)
 			return err
 		}
+		replacer.ReleaseBuffer(&bytebufferpool.ByteBuffer{
+			B: res.SwapBody(nil),
+		})
 	} else {
 		buf = &bytebufferpool.ByteBuffer{
 			B: res.SwapBody(nil),
