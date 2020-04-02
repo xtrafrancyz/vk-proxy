@@ -36,7 +36,6 @@ type ProxyConfig struct {
 	LogVerbosity      int
 	GzipUpstream      bool
 	FilterFeed        bool
-	Concurrency       int
 }
 
 type Proxy struct {
@@ -68,7 +67,6 @@ func NewProxy(config ProxyConfig) *Proxy {
 		ReduceMemoryUsage: config.ReduceMemoryUsage,
 		ReadBufferSize:    readBufferSize,
 		Name:              "vk-proxy",
-		Concurrency:       config.Concurrency,
 	}
 	if p.config.LogVerbosity > 0 {
 		p.tracker.start()

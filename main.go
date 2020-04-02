@@ -18,7 +18,6 @@ func main() {
 	flag.BoolVar(&config.ReduceMemoryUsage, "reduce-memory-usage", false, "reduces memory usage at the cost of higher CPU usage")
 	flag.BoolVar(&config.FilterFeed, "filter-feed", true, "when enabled, ads from feed will be removed")
 	flag.BoolVar(&config.GzipUpstream, "gzip-upstream", true, "use gzip for requests to api.vk.com")
-	flag.IntVar(&config.Concurrency, "concurrency", 256*1024, "the maximum number of concurrent connections the server may serve")
 
 	iniflags.Parse()
 
