@@ -36,14 +36,20 @@ func main() {
 
 	p := NewProxy(config)
 
-	var err error
-	if strings.HasPrefix(*bind, "/") {
-		err = p.ListenUnix(*bind)
-	} else {
-		err = p.ListenTCP(*bind)
+	for _, host := range strings.Split(*bind, ",") {
+		go func(host string) {
+			var err error
+			if strings.HasPrefix(host, "/") {
+				err = p.ListenUnix(host)
+			} else {
+				err = p.ListenTCP(host)
+			}
+			if err != nil {
+				log.Printf("Failed to bind listener on %s with %s", host, err.Error())
+			}
+		}(strings.TrimSpace(host))
 	}
 
-	if err != nil {
-		log.Fatalf("Could not start server: %s", err)
-	}
+	// Sleep forever
+	select {}
 }
