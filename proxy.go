@@ -18,7 +18,35 @@ import (
 
 const (
 	readBufferSize = 8192
+
+	byteBufferPoolSetupRounds = 42000   // == bytebufferpool.calibrateCallsThreshold
+	byteBufferPoolSetupSize   = 2097152 // 2**21
 )
+
+func init() {
+	// Настройка размера буфера для ответа
+	r := fasthttp.Response{}
+	for i := 0; i <= byteBufferPoolSetupRounds; i++ {
+		r.SetBodyString("")
+		if b := r.Body(); cap(b) != byteBufferPoolSetupSize {
+			r.SwapBody(make([]byte, byteBufferPoolSetupSize))
+		} else {
+			r.SwapBody(b[:cap(b)])
+		}
+		r.ResetBody()
+	}
+
+	// Настройка размера реплейсера
+	for i := 0; i <= byteBufferPoolSetupRounds; i++ {
+		b := replacer.AcquireBuffer()
+		if cap(b.B) != byteBufferPoolSetupSize {
+			b.B = make([]byte, byteBufferPoolSetupSize)
+		} else {
+			b.B = b.B[:cap(b.B)]
+		}
+		replacer.ReleaseBuffer(b)
+	}
+}
 
 var (
 	gzip            = []byte("gzip")
