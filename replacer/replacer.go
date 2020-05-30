@@ -33,6 +33,7 @@ type domainConfig struct {
 	headLocationReplace x.Replace
 
 	vkuiLangsHtml x.Replace
+	vkuiLangsHtml2 x.Replace
 	vkuiLangsJs   x.Replace
 	vkuiApiJs     x.Replace
 }
@@ -73,6 +74,7 @@ func (r *Replacer) getDomainConfig() *domainConfig {
 		cfg.headLocationReplace = newRegexReplace(`^https?://([^/]+)(.*)`, `https://`+r.ProxyBaseDomain+`/@$1$2`)
 
 		cfg.vkuiLangsHtml = newRegexReplace(` src="https://(?:vk.com|'[^']+')/js/vkui_lang`, ` src="https://`+r.ProxyBaseDomain+`/_/vk.com/js/vkui_lang`)
+		cfg.vkuiLangsHtml2 = newStringReplace(`url("https://vk.com`, `url("https://`+r.ProxyBaseDomain+`/_/vk.com`)
 		cfg.vkuiLangsJs = newStringReplace(`langpackEntry:"https://vk.com"`, `langpackEntry:"https://`+r.ProxyBaseDomain+`/_/vk.com"`)
 		cfg.vkuiApiJs = newStringReplace(`api.vk.com`, r.ProxyBaseDomain)
 		r.config = cfg
@@ -200,6 +202,7 @@ func (r *Replacer) DoReplaceResponse(res *fasthttp.Response, body *bytebufferpoo
 			contentType := string(res.Header.ContentType())
 			if strings.HasPrefix(contentType, "text/html") {
 				body = config.vkuiLangsHtml.Apply(body)
+				body = config.vkuiLangsHtml2.Apply(body)
 			}
 		}
 	} else if strings.HasSuffix(ctx.Host, ".vkuseraudio.net") || strings.HasSuffix(ctx.Host, ".vkuseraudio.com") {
