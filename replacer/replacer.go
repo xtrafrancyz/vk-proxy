@@ -10,14 +10,14 @@ import (
 	"github.com/valyala/fasthttp"
 	"github.com/xtrafrancyz/vk-proxy/replacer/hardcode"
 	"github.com/xtrafrancyz/vk-proxy/replacer/x"
-	"github.com/xtrafrancyz/vk-proxy/shared"
 )
 
 var (
 	json = jsoniter.ConfigFastest
 
-	httpsStr     = []byte("https:")
-	indexM3u8Str = []byte("/index.m3u8")
+	httpsStr         = []byte("https:")
+	indexM3u8Str     = []byte("/index.m3u8")
+	methodOptionsStr = []byte("OPTIONS")
 )
 
 type domainConfig struct {
@@ -81,7 +81,7 @@ func (r *Replacer) getDomainConfig() *domainConfig {
 }
 
 func (r *Replacer) DoReplaceRequest(req *fasthttp.Request, ctx *ReplaceContext) {
-	if bytes.Equal(ctx.Method, shared.MethodOptions) {
+	if bytes.Equal(ctx.Method, methodOptionsStr) {
 		// Заменяем заголовок Origin для CORS на заспросах со страниц VKUI
 		// api.vk.com принимает только "https://static.vk.com" в заголовке Origin
 		// Плюс к этому, если послать некорректный Referer, вк тоже пошлет нас куда подальше
@@ -121,7 +121,7 @@ func (r *Replacer) DoReplaceRequest(req *fasthttp.Request, ctx *ReplaceContext) 
 func (r *Replacer) DoReplaceResponse(res *fasthttp.Response, body *bytebufferpool.ByteBuffer, ctx *ReplaceContext) *bytebufferpool.ByteBuffer {
 	config := r.getDomainConfig()
 
-	if bytes.Equal(ctx.Method, shared.MethodOptions) {
+	if bytes.Equal(ctx.Method, methodOptionsStr) {
 		// Если в ответ на запрос OPTIONS с заданным Origin придет какой-то кривой ответ, то запросы не будут проходить
 		if corsOrigin := res.Header.Peek("Access-Control-Allow-Origin"); corsOrigin != nil {
 			res.Header.Set("Access-Control-Allow-Origin", "https://"+r.ProxyStaticDomain)

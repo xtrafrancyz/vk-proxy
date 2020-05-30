@@ -1,9 +1,7 @@
 package replacer
 
 import (
-	"bufio"
 	"bytes"
-	"io"
 	"regexp"
 	"sync"
 
@@ -132,62 +130,6 @@ func (v *stringReplace) Apply(input *bytebufferpool.ByteBuffer) *bytebufferpool.
 	releaseMatches(matches)
 	ReleaseBuffer(input)
 	return output
-}
-
-func (v *stringReplace) ApplyStream(r *bufio.Reader, w *bufio.Writer) error {
-	for {
-		data, err := r.ReadSlice(v.needle[0])
-		// Нечего заменять, пишем в ответ
-		if err != nil {
-			if len(data) > 0 {
-				_, err = w.Write(data)
-				if err != nil {
-					return err
-				}
-				continue
-			}
-			if err == io.EOF {
-				return nil
-			}
-			return err
-		}
-		// Пишем все что было до найденного
-		_, err = w.Write(data[:len(data)-1])
-		if err != nil {
-			return err
-		}
-
-		// Пробуем считать длину искомой строки
-		buf := make([]byte, v.needleLen-1)
-		n, err := io.ReadFull(r, buf)
-		if err != nil {
-			// Исходник закончился слишком быстро
-			if err == io.ErrUnexpectedEOF {
-				goto skip
-			}
-			return err
-		}
-
-		// Если это искомая строка
-		if bytes.Equal(v.needle[1:], buf) {
-			_, err = w.Write(v.replacement)
-			if err != nil {
-				return err
-			}
-			continue
-		}
-
-	skip:
-		// Иначе пишем все как было
-		err = w.WriteByte(v.needle[0])
-		if err != nil {
-			return err
-		}
-		_, err = w.Write(buf[:n])
-		if err != nil {
-			return err
-		}
-	}
 }
 
 func acquireMatches() []int {
