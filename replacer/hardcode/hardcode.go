@@ -30,7 +30,6 @@ var (
 	vkStr                 = []byte("vk")
 	comStr                = []byte("com")
 	netStr                = []byte("net")
-	meStr                 = []byte("me")
 	videoStr              = []byte("video")
 	audioStr              = []byte("audio")
 	liveStr               = []byte("live")
@@ -180,14 +179,12 @@ func (v *hardcodedDomainReplace) Apply(input *bytebufferpool.ByteBuffer) *bytebu
 				if !bytes.Equal(uri.host[2], netStr) {
 					continue
 				}
-			} else if bytes.Equal(uri.host[1], vkStr) { // *.vk.com
-				if bytes.Equal(uri.host[2], comStr) {
-					// Домен m.vk.com не проксим
+			} else if bytes.Equal(uri.host[1], vkStr) { // *.vk.*
+				if bytes.Equal(uri.host[2], comStr) { // *.vk.com
+					// Домен m.vk.com не проксим, все остальные *.vk.com проксятся
 					if len(uri.host[0]) == 1 && uri.host[0][0] == 'm' {
 						continue
 					}
-				} else if !bytes.Equal(uri.host[2], meStr) { // *.vk.me
-					continue
 				} else {
 					continue
 				}

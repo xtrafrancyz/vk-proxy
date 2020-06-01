@@ -223,6 +223,10 @@ func (r *Replacer) DoReplaceResponse(res *fasthttp.Response, body *bytebufferpoo
 				})
 			}
 		}
+	} else if ctx.Host == "oauth.vk.com" {
+		if ctx.Path == "/token" {
+			body = config.apiGlobalReplace.Apply(body)
+		}
 	}
 
 	return body
