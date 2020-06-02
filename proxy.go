@@ -145,7 +145,7 @@ func (p *Proxy) handleProxy(ctx *fasthttp.RequestCtx) {
 	elapsed := time.Since(start).Round(100 * time.Microsecond)
 
 	if err != nil {
-		log.Printf("%s %s error: %s", elapsed, ctx.Path(), err)
+		log.Printf("%s %s %s%s error: %s", elapsed, ctx.Request.Header.Method(), ctx.Host(), ctx.Path(), err)
 		if strings.Contains(err.Error(), "timed out") || strings.Contains(err.Error(), "timeout") {
 			ctx.Error("408 Request Timeout", 408)
 		} else {
