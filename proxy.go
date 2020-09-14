@@ -80,6 +80,8 @@ func NewProxy(config ProxyConfig) *Proxy {
 			Name:           "vk-proxy",
 			ReadBufferSize: readBufferSize,
 			TLSConfig:      &tls.Config{InsecureSkipVerify: true},
+			ReadTimeout:    30 * time.Second,
+			WriteTimeout:   10 * time.Second,
 		},
 		replacer: &replacer.Replacer{
 			ProxyBaseDomain:   config.BaseDomain,
@@ -137,7 +139,7 @@ func (p *Proxy) handleProxy(ctx *fasthttp.RequestCtx) {
 		return
 	}
 
-	err := p.client.DoTimeout(&ctx.Request, &ctx.Response, 30*time.Second)
+	err := p.client.Do(&ctx.Request, &ctx.Response)
 	if err == nil {
 		err = p.processProxyResponse(ctx, replaceContext)
 	}
