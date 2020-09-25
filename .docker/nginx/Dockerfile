@@ -13,4 +13,4 @@ CMD sed -i 's/80/'"$PORT"'/g' /etc/nginx/nginx.conf && \
     sed -i 's/127.0.0.1:8881/'"$VK_PROXY_HOST"'/g' /etc/nginx/nginx.conf && \
     sed -i 's/vk-api-proxy.example.com/'"$DOMAIN"'/g' /etc/nginx/nginx.conf && \
     sed -i 's/vk-static-proxy.example.com/'"$STATIC_DOMAIN"'/g' /etc/nginx/nginx.conf && \
-    nginx -g daemon off;
+    nginx -g "daemon off;"
