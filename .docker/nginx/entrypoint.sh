@@ -1,7 +1,9 @@
 #!/bin/ash
-envsubst < /tmp/nginx.conf > /etc/nginx/nginx.conf
+set -e 
 
-Check for vk proxy up before starting the nginx
+envsubst "\$PORT \$API_DOMAIN \$STATIC_DOMAIN \$VK_PROXY_HOST \$VK_PROXY_PORT" < /tmp/nginx.conf > /etc/nginx/nginx.conf
+
+echo Check for vk proxy up before starting the nginx
 echo "Checking vk proxy status."
 until nc -z -v -w30 $VK_PROXY_HOST $VK_PROXY_PORT
 do
