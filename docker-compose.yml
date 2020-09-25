@@ -1,0 +1,20 @@
+version: '2'
+
+
+services:
+  nginx:
+    image: vk-proxy-nginx
+    build: .docker/nginx
+    environment:
+      - VK_PROXY_HOST=vk-proxy
+      - DOMAIN=...
+      - STATIC_DOMAIN=...
+    ports:
+      - 8080:8080
+  
+  vk-proxy:
+    image: vk-proxy
+    build: .
+    environment:
+      - DOMAIN=...
+      - STATIC_DOMAIN=...
