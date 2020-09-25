@@ -17,6 +17,6 @@ ENV STATIC_DOMAIN vk-static-proxy.example.com
 WORKDIR /app
 
 COPY --from=build /go/src/github.com/xtrafrancyz/vk-proxy/vk-proxy/ /app/vk-proxy
+COPY .docker/vk-proxy/entrypoint.sh /entrypoint.sh
 
-# TODO: Нормальный запуск из под entrypoint'a 
-ENTRYPOINT ["/bin/sh", "-c", "/app/vk-proxy -allowMissingConfig -bind 0.0.0.0:$PORT -domain $DOMAIN -domain-static $STATIC_DOMAIN", "-log-verbosity", "3" ]
+ENTRYPOINT [ "/entrypoint.sh" ]

@@ -6,4 +6,4 @@
 *.dylib
 *.test
 
-vk-proxy
+/vk-proxy
