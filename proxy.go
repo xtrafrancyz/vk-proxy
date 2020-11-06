@@ -82,6 +82,9 @@ func NewProxy(config ProxyConfig) *Proxy {
 			TLSConfig:      &tls.Config{InsecureSkipVerify: true},
 			ReadTimeout:    30 * time.Second,
 			WriteTimeout:   10 * time.Second,
+			RetryIf: func(request *fasthttp.Request) bool {
+				return false
+			},
 		},
 		replacer: &replacer.Replacer{
 			ProxyBaseDomain:   config.BaseDomain,
@@ -125,6 +128,7 @@ func (p *Proxy) handleProxy(ctx *fasthttp.RequestCtx) {
 
 	replaceContext := &replacer.ReplaceContext{
 		Method:     ctx.Method(),
+		OriginHost: string(ctx.Request.Host()),
 		FilterFeed: p.config.FilterFeed,
 	}
 

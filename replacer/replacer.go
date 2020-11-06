@@ -18,6 +18,7 @@ var (
 	httpsStr         = []byte("https:")
 	indexM3u8Str     = []byte("/index.m3u8")
 	methodOptionsStr = []byte("OPTIONS")
+	methodPostStr    = []byte("POST")
 )
 
 type domainConfig struct {
@@ -32,10 +33,10 @@ type domainConfig struct {
 
 	headLocationReplace x.Replace
 
-	vkuiLangsHtml x.Replace
+	vkuiLangsHtml  x.Replace
 	vkuiLangsHtml2 x.Replace
-	vkuiLangsJs   x.Replace
-	vkuiApiJs     x.Replace
+	vkuiLangsJs    x.Replace
+	vkuiApiJs      x.Replace
 }
 
 type Replacer struct {
@@ -46,9 +47,10 @@ type Replacer struct {
 }
 
 type ReplaceContext struct {
-	Method []byte
-	Host   string
-	Path   string
+	Method     []byte
+	OriginHost string
+	Host       string
+	Path       string
 
 	FilterFeed bool
 }
@@ -106,15 +108,37 @@ func (r *Replacer) DoReplaceRequest(req *fasthttp.Request, ctx *ReplaceContext) 
 		// Зачем такие костыли - никто не знает, но нужно их обходить.
 		// Если в запросе авторизации используется проксируемый статик домен - заменяем его на оригинальный.
 		if ctx.Path == "/authorize" {
-			uri := req.URI()
-			args := uri.QueryArgs()
+			var args *fasthttp.Args
+			if bytes.Equal(ctx.Method, methodPostStr) {
+				args = req.PostArgs()
+			} else {
+				args = req.URI().QueryArgs()
+			}
+
+			dirty := false
+
 			sourceUrl := args.Peek("source_url")
 			if sourceUrl != nil {
 				sourceUrls := string(sourceUrl)
 				modified := strings.Replace(sourceUrls, r.ProxyStaticDomain, "static.vk.com", 1)
 				if modified != sourceUrls {
 					args.Set("source_url", modified)
+					dirty = true
 				}
+			}
+			redirectUri := args.Peek("redirect_uri")
+			if redirectUri != nil {
+				redirectUris := string(redirectUri)
+				modified := strings.Replace(redirectUris, ctx.OriginHost, "oauth.vk.com", 1)
+				if modified != redirectUris {
+					args.Set("redirect_uri", modified)
+					dirty = true
+				}
+			}
+
+			// Для изменения PostArgs нужно вручную вставить их в боди или очистить боди
+			if dirty && bytes.Equal(ctx.Method, methodPostStr) {
+				req.SetBody(args.QueryString())
 			}
 		}
 	}
