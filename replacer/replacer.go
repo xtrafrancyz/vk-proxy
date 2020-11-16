@@ -63,9 +63,9 @@ func (r *Replacer) getDomainConfig() *domainConfig {
 			SimpleReplace: r.ProxyBaseDomain + `\/_\/`,
 			SmartReplace:  r.ProxyBaseDomain + `\/@`,
 		})
-		cfg.apiOfficialLongpollReplace = newStringReplace(`"server":"api.vk.com\/`, `"server":"`+r.ProxyBaseDomain+`\/_\/api.vk.com\/`)
-		cfg.apiVkmeLongpollReplace = newStringReplace(`"server":"api.vk.me\/`, `"server":"`+r.ProxyBaseDomain+`\/_\/api.vk.me\/`)
-		cfg.apiLongpollReplace = newStringReplace(`"server":"`, `"server":"`+r.ProxyBaseDomain+`\/_\/`)
+		cfg.apiOfficialLongpollReplace = newStringReplace(`"server":"api.vk.com\/`, `"server":"`+r.ProxyBaseDomain+`\/@api.vk.com\/`)
+		cfg.apiVkmeLongpollReplace = newStringReplace(`"server":"api.vk.me\/`, `"server":"`+r.ProxyBaseDomain+`\/@api.vk.me\/`)
+		cfg.apiLongpollReplace = newStringReplace(`"server":"`, `"server":"`+r.ProxyBaseDomain+`\/@`)
 
 		cfg.hlsReplace = newRegexReplace(`https:\/\/([-_a-zA-Z0-9]+\.(?:userapi\.com|vk-cdn\.net|vk\.me|vkuser(?:live|video)\.(?:net|com)))\/`, `https://`+r.ProxyBaseDomain+`/_/$1/`)
 		cfg.m3u8Replace = newRegexReplace(`https:\/\/([-_a-zA-Z0-9]+\.(?:userapi\.com|vk-cdn\.net|vk\.me|vkuseraudio\.(?:net|com)))\/`, `https://`+r.ProxyBaseDomain+`/_/$1/`)
