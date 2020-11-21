@@ -101,6 +101,7 @@ func NewProxy(config ProxyConfig) *Proxy {
 		ReadBufferSize:    readBufferSize,
 		Name:              "vk-proxy",
 	}
+	p.tracker.server = p.server
 	if p.config.LogVerbosity > 0 {
 		p.tracker.start()
 	}
@@ -282,13 +283,17 @@ type tracker struct {
 	requests    uint32
 	bytes       uint64
 	uniqueUsers map[string]bool
+	server      *fasthttp.Server
 }
 
 func (t *tracker) start() {
 	go func() {
 		for range time.Tick(60 * time.Second) {
 			t.lock.Lock()
-			log.Printf("Requests: %d, Traffic: %s, Online: %d", t.requests, bytefmt.ByteSize(t.bytes), len(t.uniqueUsers))
+			log.Printf("Requests: %d, Traffic: %s, Online: %d, Concurrency: %d",
+				t.requests, bytefmt.ByteSize(t.bytes), len(t.uniqueUsers),
+				t.server.GetCurrentConcurrency(),
+			)
 			t.requests = 0
 			t.bytes = 0
 			t.uniqueUsers = make(map[string]bool)
