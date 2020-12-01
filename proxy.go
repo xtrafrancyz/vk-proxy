@@ -49,12 +49,8 @@ func init() {
 }
 
 var (
-	gzip            = []byte("gzip")
-	vkProxyName     = []byte("vk-proxy")
-	serverHeader    = []byte("Server")
-	setCookie       = []byte("Set-Cookie")
-	acceptEncoding  = []byte("Accept-Encoding")
-	contentEncoding = []byte("Content-Encoding")
+	gzip        = []byte("gzip")
+	vkProxyName = []byte("vk-proxy")
 )
 
 type ProxyConfig struct {
@@ -237,22 +233,22 @@ func (p *Proxy) prepareProxyRequest(ctx *fasthttp.RequestCtx, replaceContext *re
 	// After req.URI() call it is impossible to modify URI
 	req.URI().SetScheme("https")
 	if p.config.GzipUpstream {
-		req.Header.SetBytesKV(acceptEncoding, gzip)
+		req.Header.SetBytesV(fasthttp.HeaderAcceptEncoding, gzip)
 	} else {
-		req.Header.DelBytes(acceptEncoding)
+		req.Header.Del(fasthttp.HeaderAcceptEncoding)
 	}
 	return true
 }
 
 func (p *Proxy) processProxyResponse(ctx *fasthttp.RequestCtx, replaceContext *replacer.ReplaceContext) error {
 	res := &ctx.Response
-	res.Header.DelBytes(setCookie)
-	res.Header.SetBytesKV(serverHeader, vkProxyName)
+	res.Header.Del(fasthttp.HeaderSetCookie)
+	res.Header.SetBytesV(fasthttp.HeaderServer, vkProxyName)
 
 	var buf *bytebufferpool.ByteBuffer
 	// Gunzip body if needed
-	if bytes.Contains(res.Header.PeekBytes(contentEncoding), gzip) {
-		res.Header.DelBytes(contentEncoding)
+	if bytes.Contains(res.Header.Peek(fasthttp.HeaderContentEncoding), gzip) {
+		res.Header.Del(fasthttp.HeaderContentEncoding)
 		buf = replacer.AcquireBuffer()
 		_, err := fasthttp.WriteGunzip(buf, res.Body())
 		if err != nil {
