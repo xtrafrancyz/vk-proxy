@@ -51,6 +51,10 @@ func init() {
 var (
 	gzip        = []byte("gzip")
 	vkProxyName = []byte("vk-proxy")
+
+	replaceContextPool = sync.Pool{New: func() interface{} {
+		return &replacer.ReplaceContext{}
+	}}
 )
 
 type ProxyConfig struct {
@@ -73,11 +77,14 @@ type Proxy struct {
 func NewProxy(config ProxyConfig) *Proxy {
 	p := &Proxy{
 		client: &fasthttp.Client{
-			Name:           "vk-proxy",
-			ReadBufferSize: readBufferSize,
-			TLSConfig:      &tls.Config{InsecureSkipVerify: true},
-			ReadTimeout:    30 * time.Second,
-			WriteTimeout:   10 * time.Second,
+			Name:                      "vk-proxy",
+			ReadBufferSize:            readBufferSize,
+			TLSConfig:                 &tls.Config{InsecureSkipVerify: true},
+			ReadTimeout:               30 * time.Second,
+			WriteTimeout:              10 * time.Second,
+			DisablePathNormalizing:    true,
+			NoDefaultUserAgentHeader:  true,
+			MaxIdemponentCallAttempts: 0,
 			RetryIf: func(request *fasthttp.Request) bool {
 				return false
 			},
@@ -92,10 +99,15 @@ func NewProxy(config ProxyConfig) *Proxy {
 		config: config,
 	}
 	p.server = &fasthttp.Server{
-		Handler:           p.handleProxy,
-		ReduceMemoryUsage: config.ReduceMemoryUsage,
-		ReadBufferSize:    readBufferSize,
-		Name:              "vk-proxy",
+		Handler:                      p.handleProxy,
+		ReduceMemoryUsage:            config.ReduceMemoryUsage,
+		ReadBufferSize:               readBufferSize,
+		ReadTimeout:                  10 * time.Second,
+		WriteTimeout:                 20 * time.Second,
+		IdleTimeout:                  1 * time.Minute,
+		NoDefaultContentType:         true,
+		DisablePreParseMultipartForm: true,
+		Name:                         "vk-proxy",
 	}
 	p.tracker.server = p.server
 	if p.config.LogVerbosity > 0 {
@@ -123,11 +135,10 @@ func (p *Proxy) handleProxy(ctx *fasthttp.RequestCtx) {
 	}()
 	start := time.Now()
 
-	replaceContext := &replacer.ReplaceContext{
-		Method:     ctx.Method(),
-		OriginHost: string(ctx.Request.Host()),
-		FilterFeed: p.config.FilterFeed,
-	}
+	replaceContext := replaceContextPool.Get().(*replacer.ReplaceContext)
+	replaceContext.Method = ctx.Method()
+	replaceContext.OriginHost = string(ctx.Request.Host())
+	replaceContext.FilterFeed = p.config.FilterFeed
 
 	if !p.prepareProxyRequest(ctx, replaceContext) {
 		ctx.Error("400 Bad Request", 400)
@@ -145,6 +156,9 @@ func (p *Proxy) handleProxy(ctx *fasthttp.RequestCtx) {
 		err = p.processProxyResponse(ctx, replaceContext)
 	}
 
+	replaceContext.Reset()
+	replaceContextPool.Put(replaceContext)
+
 	elapsed := time.Since(start).Round(100 * time.Microsecond)
 
 	if err != nil {
@@ -160,7 +174,7 @@ func (p *Proxy) handleProxy(ctx *fasthttp.RequestCtx) {
 	if p.config.LogVerbosity > 0 {
 		ip := ctx.Request.Header.Peek("CF-Connecting-IP") // Cloudflare
 		if ip == nil {
-			ip = ctx.Request.Header.Peek("X-Real-IP") // nginx
+			ip = ctx.Request.Header.Peek(fasthttp.HeaderXForwardedFor) // nginx
 		}
 		if ip == nil {
 			ip = []byte(ctx.RemoteIP().String()) // real

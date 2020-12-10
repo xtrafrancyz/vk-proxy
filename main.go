@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"log"
+	"runtime"
 	"strings"
 
 	"github.com/valyala/fasthttp"
@@ -32,6 +33,8 @@ func main() {
 				log.Fatalf("Could not start pprof server: %s", err)
 			}
 		}()
+	} else {
+		runtime.MemProfileRate = 0
 	}
 
 	p := NewProxy(config)

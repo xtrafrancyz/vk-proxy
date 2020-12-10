@@ -55,6 +55,14 @@ type ReplaceContext struct {
 	FilterFeed bool
 }
 
+func (c *ReplaceContext) Reset() {
+	c.Method = nil
+	c.OriginHost = ""
+	c.Host = ""
+	c.Path = ""
+	c.FilterFeed = false
+}
+
 func (r *Replacer) getDomainConfig() *domainConfig {
 	if r.config == nil {
 		cfg := &domainConfig{}
