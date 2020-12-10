@@ -8,21 +8,6 @@ import (
 	"github.com/valyala/bytebufferpool"
 )
 
-var domainChars = func() (as asciiSet) {
-	for i := 'a'; i <= 'z'; i++ {
-		as.add(byte(i))
-	}
-	for i := 'A'; i <= 'Z'; i++ {
-		as.add(byte(i))
-	}
-	for i := '0'; i <= '9'; i++ {
-		as.add(byte(i))
-	}
-	as.add(byte('-'))
-	as.add(byte('_'))
-	return
-}()
-
 var (
 	userapiStr            = []byte("userapi")
 	vkuserStr             = []byte("vkuser")
@@ -43,6 +28,30 @@ var (
 	stickerPathStr        = []byte(`sticker`)
 	stickersPathEndingStr = []byte(`s_`)
 	videoHlsStr           = []byte(`video_hls.php`)
+
+	domainChars = func() (as asciiSet) {
+		for i := 'a'; i <= 'z'; i++ {
+			as.add(byte(i))
+		}
+		for i := 'A'; i <= 'Z'; i++ {
+			as.add(byte(i))
+		}
+		for i := '0'; i <= '9'; i++ {
+			as.add(byte(i))
+		}
+		as.add(byte('-'))
+		as.add(byte('_'))
+		return
+	}()
+
+	insertionsPool = sync.Pool{New: func() interface{} {
+		i := make([]insertion, 0, 32)
+		return &i
+	}}
+
+	parsedUriPool = sync.Pool{New: func() interface{} {
+		return &parsedUri{}
+	}}
 )
 
 const (
@@ -109,13 +118,25 @@ func NewHardcodedDomainReplace(config HardcodedDomainReplaceConfig) *hardcodedDo
 }
 
 func (v *hardcodedDomainReplace) Apply(input *bytebufferpool.ByteBuffer) *bytebufferpool.ByteBuffer {
-	var output *bytebufferpool.ByteBuffer
-	var uri parsedUri
-	offset := 0
+	// Быстрый путь для ответов без ссылок
+	index := bytes.Index(input.B, escapedDoubleSlashStr)
+	if index == -1 {
+		return input
+	}
+
+	offset := index
 	inputLen := len(input.B)
-	var insertions []insertion
+
+	uri := parsedUriPool.Get().(*parsedUri)
+	_insertion := insertionsPool.Get().(*[]insertion)
+	insertions := *_insertion
+	defer func() {
+		*_insertion = insertions[:0]
+		insertionsPool.Put(_insertion)
+	}()
+
 	for {
-		index := bytes.Index(input.B[offset:], escapedDoubleSlashStr)
+		index = bytes.Index(input.B[offset:], escapedDoubleSlashStr)
 		if index == -1 {
 			break
 		}
@@ -207,15 +228,14 @@ func (v *hardcodedDomainReplace) Apply(input *bytebufferpool.ByteBuffer) *bytebu
 		} else {
 			continue
 		}
-		if insertions == nil {
-			insertions = acquireInsertions()
-		}
 		insertions = append(insertions, insertion{
 			offset:  offset,
 			content: ins,
 		})
 	}
-	if insertions == nil {
+	parsedUriPool.Put(uri)
+
+	if len(insertions) == 0 {
 		return input
 	}
 
@@ -224,7 +244,7 @@ func (v *hardcodedDomainReplace) Apply(input *bytebufferpool.ByteBuffer) *bytebu
 		neededLength += len(ins.content)
 	}
 
-	output = v.pool.Get()
+	output := v.pool.Get()
 	if cap(output.B) < neededLength {
 		output.B = make([]byte, 0, roundUpToPowerOfTwo(neededLength))
 	}
@@ -236,7 +256,6 @@ func (v *hardcodedDomainReplace) Apply(input *bytebufferpool.ByteBuffer) *bytebu
 	}
 	output.B = append(output.B, input.B[lastAppend:]...)
 
-	releaseInsertions(insertions)
 	v.pool.Put(input)
 	return output
 }
@@ -305,18 +324,3 @@ func (as *asciiSet) add(c byte) bool {
 func (as *asciiSet) contains(c byte) bool {
 	return (as[c>>5] & (1 << uint(c&31))) != 0
 }
-
-func acquireInsertions() []insertion {
-	v := insertionsPool.Get()
-	if v != nil {
-		return v.([]insertion)
-	}
-	return make([]insertion, 0, 32)
-}
-
-func releaseInsertions(a []insertion) {
-	a = a[:0]
-	insertionsPool.Put(a)
-}
-
-var insertionsPool sync.Pool

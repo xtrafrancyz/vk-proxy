@@ -10,6 +10,13 @@ import (
 
 var (
 	replaceBufferPool bytebufferpool.Pool
+
+	// В sync.Pool необходимо хранить только указатели, иначе при каждом Put будет аллокация для interface{}
+	// В итоге тут хранится *[]int, в добавок этот указатель нужно будет переиспользовать для записи
+	matchesPool = sync.Pool{New: func() interface{} {
+		m := make([]int, 0, 16)
+		return &m
+	}}
 )
 
 type regexReplace struct {
@@ -90,21 +97,22 @@ func newStringReplace(needle, replace string) *stringReplace {
 }
 
 func (v *stringReplace) Apply(input *bytebufferpool.ByteBuffer) *bytebufferpool.ByteBuffer {
-	var matches []int
-	offset := 0
+	index := bytes.Index(input.B, v.needle)
+	if index == -1 {
+		return input
+	}
+	offset := index
+
+	_matches := matchesPool.Get().(*[]int)
+	matches := *_matches
+
 	for {
-		index := bytes.Index(input.B[offset:], v.needle)
+		index = bytes.Index(input.B[offset:], v.needle)
 		if index == -1 {
 			break
 		}
-		if matches == nil {
-			matches = acquireMatches()
-		}
 		matches = append(matches, offset+index)
 		offset += index + v.needleLen
-	}
-	if matches == nil {
-		return input
 	}
 
 	output := AcquireBuffer()
@@ -127,22 +135,9 @@ func (v *stringReplace) Apply(input *bytebufferpool.ByteBuffer) *bytebufferpool.
 	offset += copy(output.B[offset:], input.B[matches[len(matches)-1]+v.needleLen:])
 	output.B = output.B[0:offset]
 
-	releaseMatches(matches)
+	*_matches = matches[:0]
+	matchesPool.Put(_matches)
+
 	ReleaseBuffer(input)
 	return output
 }
-
-func acquireMatches() []int {
-	v := matchesPool.Get()
-	if v != nil {
-		return v.([]int)
-	}
-	return make([]int, 0, 16)
-}
-
-func releaseMatches(a []int) {
-	a = a[:0]
-	matchesPool.Put(a)
-}
-
-var matchesPool sync.Pool
