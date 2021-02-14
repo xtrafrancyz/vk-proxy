@@ -251,12 +251,15 @@ func (p *Proxy) prepareProxyRequest(ctx *fasthttp.RequestCtx, replaceContext *re
 	} else {
 		req.Header.Del(fasthttp.HeaderAcceptEncoding)
 	}
+
+	req.Header.Del(fasthttp.HeaderConnection)
 	return true
 }
 
 func (p *Proxy) processProxyResponse(ctx *fasthttp.RequestCtx, replaceContext *replacer.ReplaceContext) error {
 	res := &ctx.Response
 	res.Header.Del(fasthttp.HeaderSetCookie)
+	res.Header.Del(fasthttp.HeaderConnection)
 	res.Header.SetBytesV(fasthttp.HeaderServer, vkProxyName)
 
 	var buf *bytebufferpool.ByteBuffer
