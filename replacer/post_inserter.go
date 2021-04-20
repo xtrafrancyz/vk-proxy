@@ -85,6 +85,9 @@ func init() {
 }
 
 func tryInsertAdPost(response map[string]interface{}) bool {
+	if adPost == nil {
+		return false
+	}
 	return adPost.apply(response, false)
 }
 
