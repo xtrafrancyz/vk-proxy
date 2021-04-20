@@ -26,9 +26,6 @@ func main() {
 
 	iniflags.Parse()
 
-	println(config.FilterFeed)
-	println(config.AddUselessProxyMessage)
-
 	if *pprofHost != "" {
 		go func() {
 			log.Printf("Starting pprof server on http://%s", *pprofHost)
