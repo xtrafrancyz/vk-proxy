@@ -1,0 +1,67 @@
+{
+  "response": {
+    "probability": 1.1,
+    "groups": [
+      {
+        "id": 174655798,
+        "name": "Альтернативный прокси для ВКонтакте",
+        "screen_name": "vk_proxy",
+        "is_closed": 0,
+        "type": "page",
+        "is_admin": 0,
+        "admin_level": 0,
+        "is_member": 0,
+        "is_advertiser": 0,
+        "verified": 0,
+        "trending": 0,
+        "photo_100": "https:\/\/1vk-api-proxy.xtrafrancyz.net\/_\/sun1-94.userapi.com\/s\/v1\/if1\/dqw0amAJOuBShfCNzFx8f-oNC8pS_tI8OtsULtLbZDqyrh-oSrcaFSOuKCG-zeLgLmXYE4be.jpg?size=100x0&quality=96&crop=27,30,448,448&ava=1",
+        "photo_50": "https:\/\/1vk-api-proxy.xtrafrancyz.net\/_\/sun1-94.userapi.com\/s\/v1\/if1\/OSdAUqPYDBdhwkDfVP9fL9LINMCW8ezLC8t4rJ4df0UKMZoagzzNCau956n1MsvyfFnfkIKc.jpg?size=50x0&quality=96&crop=27,30,448,448&ava=1"
+      }
+    ],
+    "items": [
+      {
+        "id": 47,
+        "from_id": -174655798,
+        "owner_id": -174655798,
+        "date": 1618905881,
+        "type": "post",
+        "marked_as_ads": 0,
+        "post_type": "post",
+        "text": "Привет!\n\nПохоже что у тебя включен Альтернативный прокси, но пользователям из России он совершенно НЕ НУЖЕН. Рекомендуем его ОТКЛЮЧИТЬ, чтобы приложение работало лучше.\n\nПрокси используется для обхода блокировки ВКонтакте в тех странах, где без этого никак, например в Украине или Туркменистане. Также его можно использовать и в странах Европы для доступа к музыке, которая блокируется из-за авторских прав.\n\nСогласно статистике, 68% пользователей прокси находятся в России, и они не получают совершенно ничего, кроме проблем с недоступностью нашего прокси.\n\nСпасибо за внимание!",
+        "can_edit": 0,
+        "created_by": 19589499,
+        "can_delete": 0,
+        "can_pin": 0,
+        "post_source": {
+          "type": "vk"
+        },
+        "comments": {
+          "count": 0,
+          "can_post": 1,
+          "groups_can_post": true,
+          "can_close": 0
+        },
+        "likes": {
+          "count": 0,
+          "user_likes": 0,
+          "can_like": 1,
+          "can_publish": 0
+        },
+        "reposts": {
+          "count": 0,
+          "wall_count": 0,
+          "mail_count": 0,
+          "user_reposted": 0
+        },
+        "views": {
+          "count": 0
+        },
+        "is_favorite": false,
+        "donut": {
+          "is_donut": false
+        },
+        "short_text_rate": 0.73
+      }
+    ]
+  }
+}

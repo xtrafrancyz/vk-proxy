@@ -20,10 +20,14 @@ func main() {
 	flag.IntVar(&config.LogVerbosity, "log-verbosity", 1, "0 - only errors, 1 - stats every minute, 2 - all requests, 3 - requests with body")
 	flag.BoolVar(&config.ReduceMemoryUsage, "reduce-memory-usage", false, "reduces memory usage at the cost of higher CPU usage")
 	flag.BoolVar(&config.FilterFeed, "filter-feed", true, "when enabled, ads from feed will be removed")
+	flag.BoolVar(&config.AddUselessProxyMessage, "useless-proxy-message", false, "add message to feed when proxy is not needed")
 	flag.BoolVar(&config.GzipUpstream, "gzip-upstream", true, "use gzip for requests to api.vk.com")
 	pprofHost := flag.String("pprof-bind", "", "address to bind pprof handler (like 127.0.0.1:7777)")
 
 	iniflags.Parse()
+
+	println(config.FilterFeed)
+	println(config.AddUselessProxyMessage)
 
 	if *pprofHost != "" {
 		go func() {

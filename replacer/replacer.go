@@ -40,27 +40,28 @@ type domainConfig struct {
 }
 
 type Replacer struct {
-	ProxyBaseDomain   string
-	ProxyStaticDomain string
+	ProxyBaseDomain        string
+	ProxyStaticDomain      string
+	FilterFeed             bool
+	AddUselessProxyMessage bool
 
 	config *domainConfig
 }
 
 type ReplaceContext struct {
+	RequestCtx *fasthttp.RequestCtx
 	Method     []byte
 	OriginHost string
 	Host       string
 	Path       string
-
-	FilterFeed bool
 }
 
 func (c *ReplaceContext) Reset() {
+	c.RequestCtx = nil
 	c.Method = nil
 	c.OriginHost = ""
 	c.Host = ""
 	c.Path = ""
-	c.FilterFeed = false
 }
 
 func (r *Replacer) getDomainConfig() *domainConfig {
@@ -179,7 +180,7 @@ func (r *Replacer) DoReplaceResponse(res *fasthttp.Response, body *bytebufferpoo
 			body = config.apiVkmeLongpollReplace.Apply(body)
 		}
 
-		if ctx.FilterFeed {
+		if r.FilterFeed {
 			if ctx.Path == "/method/execute.getNewsfeedSmart" ||
 				ctx.Path == "/method/newsfeed.get" {
 				var parsed map[string]interface{}
@@ -187,7 +188,10 @@ func (r *Replacer) DoReplaceResponse(res *fasthttp.Response, body *bytebufferpoo
 					if parsed["response"] != nil {
 						response := parsed["response"].(map[string]interface{})
 						modified := tryRemoveAds(response)
-						modified = tryInsertPost(response) || modified
+						modified = tryInsertAdPost(response) || modified
+						if r.AddUselessProxyMessage {
+							modified = tryInsertUselessProxyPost(response, ctx) || modified
+						}
 						if modified {
 							body.B, err = json.Marshal(parsed)
 						}

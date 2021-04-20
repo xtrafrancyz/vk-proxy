@@ -58,12 +58,13 @@ var (
 )
 
 type ProxyConfig struct {
-	ReduceMemoryUsage bool
-	BaseDomain        string
-	BaseStaticDomain  string
-	LogVerbosity      int
-	GzipUpstream      bool
-	FilterFeed        bool
+	ReduceMemoryUsage      bool
+	BaseDomain             string
+	BaseStaticDomain       string
+	LogVerbosity           int
+	GzipUpstream           bool
+	FilterFeed             bool
+	AddUselessProxyMessage bool
 }
 
 type Proxy struct {
@@ -90,8 +91,10 @@ func NewProxy(config ProxyConfig) *Proxy {
 			},
 		},
 		replacer: &replacer.Replacer{
-			ProxyBaseDomain:   config.BaseDomain,
-			ProxyStaticDomain: config.BaseStaticDomain,
+			ProxyBaseDomain:        config.BaseDomain,
+			ProxyStaticDomain:      config.BaseStaticDomain,
+			FilterFeed:             config.FilterFeed,
+			AddUselessProxyMessage: config.AddUselessProxyMessage,
 		},
 		tracker: &tracker{
 			uniqueUsers: make(map[string]bool),
@@ -136,9 +139,9 @@ func (p *Proxy) handleProxy(ctx *fasthttp.RequestCtx) {
 	start := time.Now()
 
 	replaceContext := replaceContextPool.Get().(*replacer.ReplaceContext)
+	replaceContext.RequestCtx = ctx
 	replaceContext.Method = ctx.Method()
 	replaceContext.OriginHost = string(ctx.Request.Host())
-	replaceContext.FilterFeed = p.config.FilterFeed
 
 	if !p.prepareProxyRequest(ctx, replaceContext) {
 		ctx.Error("400 Bad Request", 400)
