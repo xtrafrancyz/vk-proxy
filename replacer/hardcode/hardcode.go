@@ -13,8 +13,10 @@ var (
 	vkuserStr             = []byte("vkuser")
 	vkcdnStr              = []byte("vk-cdn")
 	vkStr                 = []byte("vk")
+	mycdnStr              = []byte("mycdn")
 	comStr                = []byte("com")
 	netStr                = []byte("net")
+	meStr                 = []byte("me")
 	videoStr              = []byte("video")
 	audioStr              = []byte("audio")
 	liveStr               = []byte("live")
@@ -198,6 +200,10 @@ func (v *hardcodedDomainReplace) Apply(input *bytebufferpool.ByteBuffer) *bytebu
 				}
 			} else if bytes.Equal(uri.host[1], vkcdnStr) { // *.vk-cdn.net
 				if !bytes.Equal(uri.host[2], netStr) {
+					continue
+				}
+			} else if bytes.Equal(uri.host[1], mycdnStr) { // *.mycdn.me
+				if !bytes.Equal(uri.host[2], meStr) {
 					continue
 				}
 			} else if bytes.Equal(uri.host[1], vkStr) { // *.vk.*
