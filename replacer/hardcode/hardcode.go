@@ -203,7 +203,12 @@ func (v *hardcodedDomainReplace) Apply(input *bytebufferpool.ByteBuffer) *bytebu
 					continue
 				}
 			} else if bytes.Equal(uri.host[1], mycdnStr) { // *.mycdn.me
-				if !bytes.Equal(uri.host[2], meStr) {
+				if bytes.Equal(uri.host[2], meStr) {
+					path := uri.getPath(input.B, offset+domainLength)
+					if bytes.Contains(path[:min(100, len(path))], m3u8Str) {
+						ins = v.smart
+					}
+				} else {
 					continue
 				}
 			} else if bytes.Equal(uri.host[1], vkStr) { // *.vk.*

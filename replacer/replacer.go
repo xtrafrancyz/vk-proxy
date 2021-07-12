@@ -76,8 +76,8 @@ func (r *Replacer) getDomainConfig() *domainConfig {
 		cfg.apiVkmeLongpollReplace = newStringReplace(`"server":"api.vk.me\/`, `"server":"`+r.ProxyBaseDomain+`\/@api.vk.me\/`)
 		cfg.apiLongpollReplace = newStringReplace(`"server":"`, `"server":"`+r.ProxyBaseDomain+`\/@`)
 
-		cfg.hlsReplace = newRegexReplace(`https:\/\/([-_a-zA-Z0-9]+\.(?:userapi\.com|vk-cdn\.net|vk\.me|vkuser(?:live|video)\.(?:net|com)))\/`, `https://`+r.ProxyBaseDomain+`/_/$1/`)
-		cfg.m3u8Replace = newRegexReplace(`https:\/\/([-_a-zA-Z0-9]+\.(?:userapi\.com|vk-cdn\.net|vk\.me|vkuseraudio\.(?:net|com)))\/`, `https://`+r.ProxyBaseDomain+`/_/$1/`)
+		cfg.hlsReplace = newRegexReplace(`https:\/\/([-_a-zA-Z0-9]+\.(?:userapi\.com|vk-cdn\.net|vk\.me|mycdn\.me|vkuser(?:live|video)\.(?:net|com)))\/`, `https://`+r.ProxyBaseDomain+`/_/$1/`)
+		cfg.m3u8Replace = newRegexReplace(`https:\/\/([-_a-zA-Z0-9]+\.(?:userapi\.com|vk-cdn\.net|vk\.me|mycdn\.me|vkuseraudio\.(?:net|com)))\/`, `https://`+r.ProxyBaseDomain+`/_/$1/`)
 		cfg.m3u8PathReplace = &regexFuncReplace{
 			regex: regexp.MustCompile(`(?m)^[^#]`),
 		}
@@ -257,6 +257,14 @@ func (r *Replacer) DoReplaceResponse(res *fasthttp.Response, body *bytebufferpoo
 				cancel:
 					return append(dst, src[start:end]...)
 				})
+			}
+		}
+	} else if strings.HasSuffix(ctx.Host, ".mycdn.me") {
+		if strings.HasSuffix(ctx.Path, ".m3u8") {
+			if location := res.Header.Peek("Location"); location != nil {
+				replaceLocationHeader(config, location, res)
+			} else {
+				body = config.m3u8Replace.Apply(body)
 			}
 		}
 	} else if ctx.Host == "oauth.vk.com" {
