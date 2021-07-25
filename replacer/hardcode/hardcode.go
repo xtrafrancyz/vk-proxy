@@ -220,6 +220,10 @@ func (v *hardcodedDomainReplace) Apply(input *bytebufferpool.ByteBuffer) *bytebu
 				} else {
 					continue
 				}
+			} else if bytes.Equal(uri.host[1], vkuserStr) { // *.vkuser.net
+				if !bytes.Equal(uri.host[2], netStr) {
+					continue
+				}
 			} else if bytes.HasPrefix(uri.host[1], vkuserStr) { // *.vkuser(audio|video|live).(net|com)
 				if !bytes.Equal(uri.host[2], comStr) && !bytes.Equal(uri.host[2], netStr) {
 					continue
