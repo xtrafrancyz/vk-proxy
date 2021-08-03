@@ -1,3 +1,4 @@
+os: linux
 language: go
 go:
   - 1.16.x
@@ -6,9 +7,6 @@ cache:
   directories: 
     - $HOME/.cache/go-build 
     - $HOME/gopath/pkg/mod
-
-env:
-  - GO111MODULE=on
 
 install: []
 
@@ -21,7 +19,8 @@ before_deploy:
 
 deploy:
   provider: releases
-  api_key: $GITHUB_RELEASES_OATH_TOKEN
+  api_key:
+    secure: "IPhW7ZcNeP47PkYrNTY1MlypMiRCwXnPLrLmid2i11z5JeoaxKOt7VdY1AX9YXAOq3O2e7uZJaPX8tbUtwHSd4gDb8iIOMRup8WxyteomTR/SFmqmNkpD0EhazrxzfJAiFcNp7/rnYLWOCf8ZIhRwC1D9ubQhAfhRLO0Rpc5+QTCnfKa6avbZU3OnOlz/TKu6xiciGSI1qjE+oTyyROfBQkJEWz66LVqll7hmnUUdAfYn68EWlzwnHpNJ3dLitDwdv9bTO9CHGlG640n0il3L33tqiPyNLnShCHt1uBPk86gZ2q+nrdgVYxY6HW6WwYzYicOd544FBDWPeCk2oAqx3fCy7LCKt40czAYi9hO3jIeCvXVB6vbNJdevHWBGGYpj7+IOAqwnjrbIubyRI4pbbSYikqAMvV1sRlgSqg6CAFmjy9PfSsCUA1tekJrSECljaphyHtOyBVK6piu3qktuDJa0NO1te4Nhk+aqcpezAJmBFrsPEQ2wQBvPl5xd8gUQCj32Y2Sg6mNIFibQ9gU5X2aBkjZKr35gxWoPpvkeV0Bi99/DiEwcmsD+dYq31SuQqoVzRGD/DJ8bQ1yriK4M0qJhc9rPCp9aDSgWNy0bRDqkFPM4GFUauoRTnIWVR7ugEXymJvUYeukHkAqKCD9+cnShw87xkKG9cXg6eOKUuA="
   file:
     - vk-proxy-linux-amd64
     - vk-proxy-linux-i386
