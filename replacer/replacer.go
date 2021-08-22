@@ -33,10 +33,8 @@ type domainConfig struct {
 
 	headLocationReplace x.Replace
 
-	vkuiLangsHtml  x.Replace
-	vkuiLangsHtml2 x.Replace
-	vkuiLangsJs    x.Replace
-	vkuiApiJs      x.Replace
+	vkuiLangsHtml             x.Replace
+	vkuiApiJs                 x.Replace
 }
 
 type Replacer struct {
@@ -84,9 +82,7 @@ func (r *Replacer) getDomainConfig() *domainConfig {
 
 		cfg.headLocationReplace = newRegexReplace(`^https?://([^/]+)(.*)`, `https://`+r.ProxyBaseDomain+`/@$1$2`)
 
-		cfg.vkuiLangsHtml = newRegexReplace(` src="https://(?:vk.com|'[^']+')/js/vkui_lang`, ` src="https://`+r.ProxyBaseDomain+`/_/vk.com/js/vkui_lang`)
-		cfg.vkuiLangsHtml2 = newStringReplace(`url("https://vk.com`, `url("https://`+r.ProxyBaseDomain+`/_/vk.com`)
-		cfg.vkuiLangsJs = newStringReplace(`langpackEntry:"https://vk.com"`, `langpackEntry:"https://`+r.ProxyBaseDomain+`/_/vk.com"`)
+		cfg.vkuiLangsHtml = newStringReplace(`https://vk.com/js/vkui_lang.js`, `https://`+r.ProxyBaseDomain+`/_/vk.com/js/vkui_lang.js`)
 		cfg.vkuiApiJs = newStringReplace(`api.vk.com`, r.ProxyBaseDomain)
 		r.config = cfg
 	}
@@ -109,48 +105,54 @@ func (r *Replacer) DoReplaceRequest(req *fasthttp.Request, ctx *ReplaceContext) 
 		}
 	}
 
-	if ctx.Host == "oauth.vk.com" {
-		// Для авторизации страницы VKUI используют не уже готовый токен авторизации, а получают его при каждом
-		// открытии страницы. В запросе авторизации передается текущий урл страницы VKUI, а так как она проксируется,
-		// то она отличается от оригинальной. ВК проверяет этот урл страницы и отвергает авторизацию если он не
-		// совпадает.
-		// Зачем такие костыли - никто не знает, но нужно их обходить.
-		// Если в запросе авторизации используется проксируемый статик домен - заменяем его на оригинальный.
-		if ctx.Path == "/authorize" {
-			var args *fasthttp.Args
-			if bytes.Equal(ctx.Method, methodPostStr) {
-				args = req.PostArgs()
-			} else {
-				args = req.URI().QueryArgs()
-			}
+	/*
+		// UPD 22.08.2021 - Пока не будет выяснен способ получения secret для генерации подписи, этот код не имеет смысла
+		if ctx.Host == "oauth.vk.com" {
+			// Для авторизации страницы VKUI используют не уже готовый токен авторизации, а получают его при каждом
+			// открытии страницы. В запросе авторизации передается текущий урл страницы VKUI, а так как она проксируется,
+			// то она отличается от оригинальной. ВК проверяет этот урл страницы и отвергает авторизацию если он не
+			// совпадает.
+			// Зачем такие костыли - никто не знает, но нужно их обходить.
+			// Если в запросе авторизации используется проксируемый статик домен - заменяем его на оригинальный.
+			if ctx.Path == "/authorize" {
+				var args *fasthttp.Args
+				if bytes.Equal(ctx.Method, methodPostStr) {
+					args = req.PostArgs()
+				} else {
+					args = req.URI().QueryArgs()
+				}
 
-			dirty := false
+				dirty := false
 
-			sourceUrl := args.Peek("source_url")
-			if sourceUrl != nil {
-				sourceUrls := string(sourceUrl)
-				modified := strings.Replace(sourceUrls, r.ProxyStaticDomain, "static.vk.com", 1)
-				if modified != sourceUrls {
-					args.Set("source_url", modified)
-					dirty = true
+				sourceUrl := args.Peek("source_url")
+				if sourceUrl != nil {
+					sourceUrls := string(sourceUrl)
+					modified := strings.Replace(sourceUrls, r.ProxyStaticDomain, "static.vk.com", 1)
+					if modified != sourceUrls {
+						args.Set("source_url", modified)
+						dirty = true
+					}
+				}
+				redirectUri := args.Peek("redirect_uri")
+				if redirectUri != nil {
+					redirectUris := string(redirectUri)
+					modified := strings.Replace(redirectUris, ctx.OriginHost, "oauth.vk.com", 1)
+					if modified != redirectUris {
+						args.Set("redirect_uri", modified)
+						dirty = true
+					}
+				}
+
+				if dirty {
+					signAuthrorize(args)
+				}
+
+				// Для изменения PostArgs нужно вручную вставить их в боди или очистить боди
+				if dirty && bytes.Equal(ctx.Method, methodPostStr) {
+					req.SetBody(args.QueryString())
 				}
 			}
-			redirectUri := args.Peek("redirect_uri")
-			if redirectUri != nil {
-				redirectUris := string(redirectUri)
-				modified := strings.Replace(redirectUris, ctx.OriginHost, "oauth.vk.com", 1)
-				if modified != redirectUris {
-					args.Set("redirect_uri", modified)
-					dirty = true
-				}
-			}
-
-			// Для изменения PostArgs нужно вручную вставить их в боди или очистить боди
-			if dirty && bytes.Equal(ctx.Method, methodPostStr) {
-				req.SetBody(args.QueryString())
-			}
-		}
-	}
+		}*/
 }
 
 func (r *Replacer) DoReplaceResponse(res *fasthttp.Response, body *bytebufferpool.ByteBuffer, ctx *ReplaceContext) *bytebufferpool.ByteBuffer {
@@ -221,7 +223,7 @@ func (r *Replacer) DoReplaceResponse(res *fasthttp.Response, body *bytebufferpoo
 				if idx0 := strings.LastIndexByte(relativePath, '/'); idx0 != -1 {
 					relativePath = relativePath[:idx0+1]
 				}
-				relativeRedirectPath := locstr[idx+13 /*static.vk.com*/:]
+				relativeRedirectPath := locstr[idx+13: /*static.vk.com*/]
 				relativeRedirectPath = relativeRedirectPath[longestCommonPrefix(relativeRedirectPath, relativePath):]
 				res.Header.Set("Location", relativeRedirectPath)
 			} else {
@@ -231,14 +233,10 @@ func (r *Replacer) DoReplaceResponse(res *fasthttp.Response, body *bytebufferpoo
 
 		if strings.HasSuffix(ctx.Path, ".js") {
 			body = config.vkuiApiJs.Apply(body)
-			if strings.HasPrefix(ctx.Path, "/community_manage") {
-				body = config.vkuiLangsJs.Apply(body)
-			}
 		} else {
 			contentType := string(res.Header.ContentType())
 			if strings.HasPrefix(contentType, "text/html") {
 				body = config.vkuiLangsHtml.Apply(body)
-				body = config.vkuiLangsHtml2.Apply(body)
 			}
 		}
 	} else if strings.HasSuffix(ctx.Host, ".vkuseraudio.net") || strings.HasSuffix(ctx.Host, ".vkuseraudio.com") {
@@ -270,6 +268,23 @@ func (r *Replacer) DoReplaceResponse(res *fasthttp.Response, body *bytebufferpoo
 	} else if ctx.Host == "oauth.vk.com" {
 		if ctx.Path == "/token" {
 			body = config.apiGlobalReplace.Apply(body)
+		}
+
+		// При авторизации из VKUI порядок запросов следующий:
+		// 1. /authorize с подписью от приложения
+		// 2. Редирект на /auth_by_token
+		// 3. Редирект на oauth.vk.com/blank.html, который мы и заменяем на прокси домен
+		//
+		// В официальных приложениях вк проверяется редирект и если он == "oauth.vk.com/blank.html", то авторизация успешная.
+		// В модах все упоминания oauth.vk.com заменяются на прокси домен, следовательно нам нужно подставлять туда
+		// наш домен.
+		if ctx.Path == "/auth_by_token" {
+			if location := res.Header.Peek("Location"); location != nil {
+				res.Header.Set(
+					"Location",
+					strings.Replace(string(location), "oauth.vk.com", ctx.OriginHost, 1),
+				)
+			}
 		}
 	}
 
