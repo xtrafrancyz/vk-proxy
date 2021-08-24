@@ -278,7 +278,7 @@ func (r *Replacer) DoReplaceResponse(res *fasthttp.Response, body *bytebufferpoo
 		// В официальных приложениях вк проверяется редирект и если он == "oauth.vk.com/blank.html", то авторизация успешная.
 		// В модах все упоминания oauth.vk.com заменяются на прокси домен, следовательно нам нужно подставлять туда
 		// наш домен.
-		if false && ctx.Path == "/auth_by_token" {
+		if ctx.Path == "/auth_by_token" {
 			if location := res.Header.Peek("Location"); location != nil {
 				res.Header.Set(
 					"Location",
