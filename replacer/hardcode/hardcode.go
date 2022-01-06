@@ -231,7 +231,7 @@ func (v *hardcodedDomainReplace) Apply(input *bytebufferpool.ByteBuffer) *bytebu
 				r := uri.host[1][len(vkuserStr):]
 				if bytes.Equal(r, audioStr) {
 					path := uri.getPath(input.B, offset+domainLength)
-					if bytes.Contains(path[:min(100, len(path))], m3u8Str) {
+					if bytes.Contains(path[:min(300, len(path))], m3u8Str) {
 						ins = v.smart
 					}
 				} else if !bytes.Equal(r, videoStr) && !bytes.Equal(r, liveStr) {
