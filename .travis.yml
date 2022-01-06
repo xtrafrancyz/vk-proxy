@@ -1,7 +1,7 @@
 os: linux
 language: go
 go:
-  - 1.16.x
+  - 1.17.x
 
 cache: 
   directories: 
