@@ -77,7 +77,7 @@ func (r *Replacer) getDomainConfig() *domainConfig {
 		cfg.hlsReplace = newRegexReplace(`https:\/\/([-_a-zA-Z0-9]+\.(?:userapi\.com|vk-cdn\.net|vk\.me|mycdn\.me|vkuser(?:live|video)\.(?:net|com)))\/`, `https://`+r.ProxyBaseDomain+`/_/$1/`)
 		cfg.m3u8Replace = newRegexReplace(`https:\/\/([-_a-zA-Z0-9]+\.(?:userapi\.com|vk-cdn\.net|vk\.me|mycdn\.me|vkuseraudio\.(?:net|com)))\/`, `https://`+r.ProxyBaseDomain+`/_/$1/`)
 		cfg.m3u8PathReplace = &regexFuncReplace{
-			regex: regexp.MustCompile(`(?m)^[^#]`),
+			regex: regexp.MustCompile(`(?mi)^[a-z0-9_-]`),
 		}
 
 		cfg.headLocationReplace = newRegexReplace(`^https?://([^/]+)(.*)`, `https://`+r.ProxyBaseDomain+`/@$1$2`)
