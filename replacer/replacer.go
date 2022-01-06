@@ -105,53 +105,52 @@ func (r *Replacer) DoReplaceRequest(req *fasthttp.Request, ctx *ReplaceContext) 
 		}
 	}
 
-	
-		// UPD 22.08.2021 - Пока не будет выяснен способ получения secret для генерации подписи, этот код не имеет смысла
-		// UPD 17.11.2021 (YTKAB0BP) - Похоже, sig больше не используется в новых версиях VK, поэтому можно использовать замену без него
-		if ctx.Host == "oauth.vk.com" {
-			// Для авторизации страницы VKUI используют не уже готовый токен авторизации, а получают его при каждом
-			// открытии страницы. В запросе авторизации передается текущий урл страницы VKUI, а так как она проксируется,
-			// то она отличается от оригинальной. ВК проверяет этот урл страницы и отвергает авторизацию если он не
-			// совпадает.
-			// Зачем такие костыли - никто не знает, но нужно их обходить.
-			// Если в запросе авторизации используется проксируемый статик домен - заменяем его на оригинальный.
-			if ctx.Path == "/authorize" {
-				var args *fasthttp.Args
-				if bytes.Equal(ctx.Method, methodPostStr) {
-					args = req.PostArgs()
-				} else {
-					args = req.URI().QueryArgs()
+	// UPD 22.08.2021 - Пока не будет выяснен способ получения secret для генерации подписи, этот код не имеет смысла
+	// UPD 17.11.2021 (YTKAB0BP) - Похоже, sig больше не используется в новых версиях VK, поэтому можно использовать замену без него
+	if ctx.Host == "oauth.vk.com" {
+		// Для авторизации страницы VKUI используют не уже готовый токен авторизации, а получают его при каждом
+		// открытии страницы. В запросе авторизации передается текущий урл страницы VKUI, а так как она проксируется,
+		// то она отличается от оригинальной. ВК проверяет этот урл страницы и отвергает авторизацию если он не
+		// совпадает.
+		// Зачем такие костыли - никто не знает, но нужно их обходить.
+		// Если в запросе авторизации используется проксируемый статик домен - заменяем его на оригинальный.
+		if ctx.Path == "/authorize" {
+			var args *fasthttp.Args
+			if bytes.Equal(ctx.Method, methodPostStr) {
+				args = req.PostArgs()
+			} else {
+				args = req.URI().QueryArgs()
+			}
+
+			if args.Peek("sig") == nil {
+				dirty := false
+
+				sourceUrl := args.Peek("source_url")
+				if sourceUrl != nil {
+					sourceUrls := string(sourceUrl)
+					modified := strings.Replace(sourceUrls, r.ProxyStaticDomain, "static.vk.com", 1)
+					if modified != sourceUrls {
+						args.Set("source_url", modified)
+						dirty = true
+					}
 				}
-				
-				if args.Peek("sig") == nil {
-					dirty := false
+				redirectUri := args.Peek("redirect_uri")
+				if redirectUri != nil {
+					redirectUris := string(redirectUri)
+					modified := strings.Replace(redirectUris, ctx.OriginHost, "oauth.vk.com", 1)
+					if modified != redirectUris {
+						args.Set("redirect_uri", modified)
+						dirty = true
+					}
+				}
 
-					sourceUrl := args.Peek("source_url")
-					if sourceUrl != nil {
-						sourceUrls := string(sourceUrl)
-						modified := strings.Replace(sourceUrls, r.ProxyStaticDomain, "static.vk.com", 1)
-						if modified != sourceUrls {
-							args.Set("source_url", modified)
-							dirty = true
-						}
-					}
-					redirectUri := args.Peek("redirect_uri")
-					if redirectUri != nil {
-						redirectUris := string(redirectUri)
-						modified := strings.Replace(redirectUris, ctx.OriginHost, "oauth.vk.com", 1)
-						if modified != redirectUris {
-							args.Set("redirect_uri", modified)
-							dirty = true
-						}
-					}
-
-					// Для изменения PostArgs нужно вручную вставить их в боди или очистить боди
-					if dirty && bytes.Equal(ctx.Method, methodPostStr) {
-						req.SetBody(args.QueryString())
-					}
+				// Для изменения PostArgs нужно вручную вставить их в боди или очистить боди
+				if dirty && bytes.Equal(ctx.Method, methodPostStr) {
+					req.SetBody(args.QueryString())
 				}
 			}
 		}
+	}
 }
 
 func (r *Replacer) DoReplaceResponse(res *fasthttp.Response, body *bytebufferpool.ByteBuffer, ctx *ReplaceContext) *bytebufferpool.ByteBuffer {
