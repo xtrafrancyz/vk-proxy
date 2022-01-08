@@ -17,6 +17,7 @@ var (
 
 	httpsStr         = []byte("https:")
 	indexM3u8Str     = []byte("/index.m3u8")
+	m3u8ExtStr       = []byte(".m3u8")
 	methodOptionsStr = []byte("OPTIONS")
 	methodPostStr    = []byte("POST")
 )
@@ -77,7 +78,7 @@ func (r *Replacer) getDomainConfig() *domainConfig {
 		cfg.hlsReplace = newRegexReplace(`https:\/\/([-_a-zA-Z0-9]+\.(?:userapi\.com|vk-cdn\.net|vk\.me|mycdn\.me|vkuser(?:live|video)\.(?:net|com)))\/`, `https://`+r.ProxyBaseDomain+`/_/$1/`)
 		cfg.m3u8Replace = newRegexReplace(`https:\/\/([-_a-zA-Z0-9]+\.(?:userapi\.com|vk-cdn\.net|vk\.me|mycdn\.me|vkuseraudio\.(?:net|com)))\/`, `https://`+r.ProxyBaseDomain+`/_/$1/`)
 		cfg.m3u8PathReplace = &regexFuncReplace{
-			regex: regexp.MustCompile(`(?mi)^[a-z0-9_-]`),
+			regex: regexp.MustCompile(`(?mi)^[a-z0-9_-].*`),
 		}
 
 		cfg.headLocationReplace = newRegexReplace(`^https?://([^/]+)(.*)`, `https://`+r.ProxyBaseDomain+`/@$1$2`)
@@ -243,10 +244,16 @@ func (r *Replacer) DoReplaceResponse(res *fasthttp.Response, body *bytebufferpoo
 				replaceLocationHeader(config, location, res)
 			} else {
 				body = config.m3u8Replace.Apply(body)
+
+				// Заменяем относительный путь для .ts файлов на абсолютный, чтобы к ним не применялись умные фильтры
+				// с заменой ссылок
 				absolutePath := "https://" + r.ProxyBaseDomain + "/_/" + ctx.Host + ctx.Path[:strings.LastIndexByte(ctx.Path, '/')+1]
 				body = config.m3u8PathReplace.ApplyFunc(body, func(src, dst []byte, start, end int) []byte {
-					// Пропускаем если это абсолютная ссылка
-					if end+5 > cap(src) || bytes.Equal(src[start:end+5], httpsStr) {
+					// Пропускаем если:
+					//  - это абсолютная ссылка (уже заменили ее заранее)
+					//  - это относительная ссылка на .m3u8, нам еще и его предстоит обработать
+					if bytes.HasPrefix(src[start:end], httpsStr) ||
+						bytes.Contains(src[start:end], m3u8ExtStr) {
 						goto cancel
 					}
 					return append(append(dst, absolutePath...), src[start:end]...)
