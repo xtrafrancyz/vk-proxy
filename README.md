@@ -1,3 +1,9 @@
+# Прекращение поддержки
+
+В связи с вторжением россии на территорию Украины 24.02.2022 я прекращаю поддержку публичного прокси. Я не считаю нужным предоставлять доступ жителям Украины к российской пропаганде и помогать вражеским компаниям.
+
+Вы все еще можете запустить прокси на своих серверах, форкнуть репу и делать что вашей душе угодно.
+
 # vk-proxy [![Uptime](https://img.shields.io/uptimerobot/ratio/7/m780088591-4c8a704c43ffe8c145057754.svg)](https://xtrafrancyz.net/unblock-vk) [![Online](https://img.shields.io/badge/endpoint.svg?url=https://other.xtrafrancyz.net/vk-proxy-badge/onlineBadge)](https://xtrafrancyz.net/unblock-vk)
 
 Прокси-сервер для API ВКонтакте, который можно использовать в Android и других приложениях.
